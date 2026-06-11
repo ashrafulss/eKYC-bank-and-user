@@ -270,35 +270,8 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Pending by document */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-xs p-6">
-            <h4 className="text-xs font-bold text-blue-900 uppercase tracking-wider mb-4">
-              Pending by Document
-            </h4>
-            <div className="space-y-3">
-              {[
-                { label: "NID", value: 28 },
-                { label: "Passport", value: 9 },
-                { label: "Driving Licence", value: 5 },
-              ].map(({ label, value }) => (
-                <div key={label}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600">{label}</span>
-                    <span className="font-semibold text-gray-900">{value}</span>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5">
-                    <div
-                      className="bg-blue-600 h-1.5 rounded-full"
-                      style={{ width: `${(value / 42) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Staff on duty */}
-          <div className="bg-blue-900 rounded-xl p-6 text-white">
+          {/* <div className="bg-blue-900 rounded-xl p-6 text-white">
             <h4 className="text-xs font-bold uppercase tracking-wider text-blue-200 mb-4">
               Staff on Duty
             </h4>
@@ -326,7 +299,7 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

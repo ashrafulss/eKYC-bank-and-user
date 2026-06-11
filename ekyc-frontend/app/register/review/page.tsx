@@ -26,7 +26,7 @@ export default function Review() {
       {
         name: "Farhana Chowdhury",
         relationship: "Spouse",
-        nidPassport: "9876 5432 1098",
+        nid: "9876 5432 1098",
         dob: "1990-07-05",
         share: "100%",
         contact: "+880 1712 345678",
@@ -208,11 +208,9 @@ export default function Review() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                <span className="text-sm font-medium text-gray-500">
-                  NID / Passport
-                </span>
+                <span className="text-sm font-medium text-gray-500">NID</span>
                 <div className="w-full sm:col-span-2 px-3 py-2 bg-slate-50/80 border border-gray-100 rounded-md text-sm font-mono text-gray-800">
-                  {nominee.nidPassport || "—"}
+                  {nominee.nid || "—"}
                 </div>
               </div>
 

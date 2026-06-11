@@ -31,7 +31,7 @@ interface Nominee {
   backError: string | null;
   name: string;
   relationship: string;
-  nidPassport: string;
+  nid: string;
   dob: string;
   share: string;
   contact: string;
@@ -46,7 +46,7 @@ function emptyNominee(): Nominee {
     backError: null,
     name: "",
     relationship: "",
-    nidPassport: "",
+    nid: "",
     dob: "",
     share: "",
     contact: "",
@@ -407,8 +407,8 @@ export default function NomineeBo() {
                       type: "text",
                     },
                     {
-                      label: "NID / Passport",
-                      field: "nidPassport",
+                      label: "NID",
+                      field: "nid",
                       type: "text",
                       mono: true,
                     },

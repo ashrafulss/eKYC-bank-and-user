@@ -10,7 +10,7 @@ interface Application {
   phone: string;
   submittedAt: string;
   status: "pending" | "verified" | "approved" | "rejected" | "re_draft";
-  docType: "NID" | "Passport";
+  docType: "NID";
 }
 
 const STATUS_STYLE: Record<Application["status"], string> = {
@@ -46,7 +46,7 @@ const mockApplications: Application[] = [
     phone: "+880 1811 000002",
     submittedAt: "2026-06-11 08:45",
     status: "verified",
-    docType: "Passport",
+    docType: "NID",
   },
   {
     id: "KYC-2026-003",
