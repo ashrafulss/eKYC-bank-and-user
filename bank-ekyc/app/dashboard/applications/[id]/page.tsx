@@ -29,7 +29,7 @@ export default function ApplicationDetailPage({ params }: PageProps) {
 
   return (
     <div className="bg-gray-50 min-h-full">
-      <div className="max-w-7xl mx-auto px-4 py-10 space-y-6">
+      <div className="max-w-8xl mx-auto px-8 py-10 space-y-6">
         {/* Header Navigation */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">

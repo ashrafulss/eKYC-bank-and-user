@@ -127,7 +127,7 @@ function StatusBadge({ status }: { status: Application["status"] }) {
 export default function DashboardPage() {
   return (
     <div className="bg-gray-50 min-h-full">
-      <div className="max-w-7xl mx-auto px-4 py-10 space-y-8">
+      <div className="max-w-8xl mx-auto px-8 py-10 space-y-8">
         {/* Page title */}
         <div className="flex items-center justify-between">
           <div>
