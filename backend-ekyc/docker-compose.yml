@@ -12,17 +12,19 @@ services:
       - POSTGRES_DB=ekyc
     volumes:
       - ./pgdata_second:/var/lib/postgresql/data
+      - ./migrations/init.sql:/docker-entrypoint-initdb.d/init.sql
 
   backend_api:
     image: node:20-alpine
     container_name: ekyc_backend_api
     working_dir: /app
-    # Overrides container start to run your modern tsx watch pipeline
     command: npm run dev
     ports:
       - "5000:5000"
     volumes:
       - .:/app
+    env_file:
+      - .env
     depends_on:
       - postgres_second
     environment:
