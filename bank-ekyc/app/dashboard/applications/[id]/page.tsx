@@ -288,7 +288,7 @@ export default function ApplicationDetailPage({ params }: PageProps) {
         />
       )}
 
-      <div className="max-w-7xl mx-auto px-4 py-10 space-y-6">
+      <div className="max-w-8xl mx-auto px-4 py-10 space-y-6">
         {/* ── HEADER ── */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">

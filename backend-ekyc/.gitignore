@@ -1,0 +1,17 @@
+# 📦 Dependencies
+node_modules/
+dist/
+
+# 🔒 Local Environment Secrets & Credentials
+.env
+.env.local
+
+# 🗄️ Docker PostgreSQL Data Volumes (CRITICAL)
+pgdata_second/
+pgdata/
+
+# 🛠️ Logs and Debugs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.eslintcache
