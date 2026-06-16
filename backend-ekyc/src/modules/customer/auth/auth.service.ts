@@ -1,6 +1,7 @@
 import crypto from "crypto"; // 🌟 CRITICAL: Add this native Node.js import at the top
 import nodemailer from "nodemailer";
 import { AuthRepository } from "./auth.repository.js";
+import { signUserToken } from "../../../utils/jwt.js";
 
 export class AuthService {
   private authRepository = new AuthRepository();
@@ -78,7 +79,6 @@ export class AuthService {
     return rawOtpCode; // Returns plaintext to controller if it prints inside terminal logs
   }
 
-  // 2. Handles verification by hashing input data and matching hashes
   async validateOTPVerification(mobile: string, otpCode: string) {
     const record = await this.authRepository.getLatestUnverifiedOTP(mobile);
 
@@ -94,21 +94,27 @@ export class AuthService {
       throw new Error("EXPIRED");
     }
 
-    // 🌟 SECURITY FIX: Hash the user's incoming plaintext input code
     const hashedInput = crypto
       .createHash("sha256")
       .update(otpCode)
       .digest("hex");
 
-    // 🌟 Compare the hashed input against the hash stored inside the DB record column
     if (record.otp_code !== hashedInput) {
       await this.authRepository.incrementOTPEffortCounter(record.id);
       throw new Error("INVALID_CODE");
     }
 
-    return await this.authRepository.finalizeUserVerification(
+    const user = await this.authRepository.finalizeUserVerification(
       record.id,
       mobile,
     );
+
+    // 🌟 Generate JWT token
+    const token = signUserToken({ id: user.id, type: "user" });
+
+    // 🌟 Save session in DB
+    await this.authRepository.createUserSession(user.id, token);
+
+    return { user, token };
   }
 }

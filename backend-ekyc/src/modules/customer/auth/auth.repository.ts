@@ -74,4 +74,15 @@ export class AuthRepository {
     const result = await pool.query(query, [mobile]);
     return result.rows[0];
   }
+
+  // Save JWT token into user_sessions table
+  async createUserSession(userId: string, tokenHash: string) {
+    const query = `
+    INSERT INTO user_sessions (user_id, token_hash, expires_at)
+    VALUES ($1, $2, NOW() + INTERVAL '7 days')
+    RETURNING *;
+  `;
+    const result = await pool.query(query, [userId, tokenHash]);
+    return result.rows[0];
+  }
 }

@@ -1,15 +1,21 @@
 import dotenv from "dotenv";
+dotenv.config();
+
 import app from "./app.js";
 import initiateRoutes from "./routes/routes.js";
-import pool from "./config/db.js"; //  Import your pool configuration here
-
-dotenv.config();
+import pool from "./config/db.js";
+import { errorHandler, notFoundHandler } from "./middlewares/errorHandler.js";
 
 const PORT = process.env.PORT || 5000;
 
+// ── MOUNT ALL ROUTES ────────────────────────────────────────
 initiateRoutes(app);
 
-// Test database connection pool health immediately on startup
+// ──  GLOBAL ERROR HANDLER (must be after routes) ───────
+app.use(notFoundHandler);
+app.use(errorHandler);
+
+// ── DATABASE HEALTH CHECK ────────────────────────────────────
 async function checkDatabaseConnection() {
   try {
     const res = await pool.query("SELECT NOW()");
@@ -26,5 +32,5 @@ async function checkDatabaseConnection() {
 
 app.listen(PORT, async () => {
   console.log(`[Server]: Operating perfectly on port ${PORT}`);
-  await checkDatabaseConnection(); // Run the database verification check
+  await checkDatabaseConnection();
 });
