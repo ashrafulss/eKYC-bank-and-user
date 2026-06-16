@@ -27,8 +27,8 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS otp_verification (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   mobile        VARCHAR(20) NOT NULL,
-  email         VARCHAR(255) NOT NULL, 
-  otp_code      VARCHAR(6) NOT NULL,
+  email         VARCHAR(255) NULL, 
+  otp_code      VARCHAR(64) NOT NULL,
   attempts      INTEGER DEFAULT 0,       -- prevent brute force
   verified      BOOLEAN DEFAULT FALSE,
   expires_at    TIMESTAMP NOT NULL,
