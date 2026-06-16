@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS users (
   is_verified   BOOLEAN DEFAULT FALSE,
   status        VARCHAR(20) DEFAULT 'active'
                 CHECK (status IN ('active', 'suspended', 'deleted')),
-  created_at    TIMESTAMP DEFAULT NOW(),
-  updated_at    TIMESTAMP DEFAULT NOW()
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
@@ -31,8 +31,8 @@ CREATE TABLE IF NOT EXISTS otp_verification (
   otp_code      VARCHAR(64) NOT NULL,
   attempts      INTEGER DEFAULT 0,       -- prevent brute force
   verified      BOOLEAN DEFAULT FALSE,
-  expires_at    TIMESTAMP NOT NULL,
-  created_at    TIMESTAMP DEFAULT NOW()
+  expires_at    TIMESTAMPTZ NOT NULL,
+  created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
@@ -44,8 +44,8 @@ CREATE TABLE IF NOT EXISTS user_sessions (
   token_hash    VARCHAR(255) NOT NULL,
   ip_address    VARCHAR(45),
   user_agent    TEXT,
-  expires_at    TIMESTAMP NOT NULL,
-  created_at    TIMESTAMP DEFAULT NOW()
+  expires_at    TIMESTAMPTZ NOT NULL,
+  created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
@@ -61,10 +61,10 @@ CREATE TABLE IF NOT EXISTS bank_staff (
   branch        VARCHAR(100),
   department    VARCHAR(100),
   is_active     BOOLEAN DEFAULT TRUE,
-  last_login    TIMESTAMP,
+  last_login    TIMESTAMPTZ,
   created_by    UUID REFERENCES bank_staff(id) ON DELETE SET NULL,
-  created_at    TIMESTAMP DEFAULT NOW(),
-  updated_at    TIMESTAMP DEFAULT NOW()
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
@@ -76,8 +76,8 @@ CREATE TABLE IF NOT EXISTS staff_sessions (
   token_hash    VARCHAR(255) NOT NULL,
   ip_address    VARCHAR(45),
   user_agent    TEXT,
-  expires_at    TIMESTAMP NOT NULL,
-  created_at    TIMESTAMP DEFAULT NOW()
+  expires_at    TIMESTAMPTZ NOT NULL,
+  created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
@@ -105,8 +105,8 @@ CREATE TABLE IF NOT EXISTS applications (
                   'approved',
                   'rejected'
                 )),
-  submitted_at  TIMESTAMP DEFAULT NOW(),
-  updated_at    TIMESTAMP DEFAULT NOW()
+  submitted_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
@@ -123,8 +123,8 @@ CREATE TABLE IF NOT EXISTS personal_info (
   nationality     VARCHAR(50),
   mobile          VARCHAR(20),
   email           VARCHAR(100),
-  created_at      TIMESTAMP DEFAULT NOW(),
-  updated_at      TIMESTAMP DEFAULT NOW()
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
@@ -139,8 +139,8 @@ CREATE TABLE IF NOT EXISTS address_info (
   district        VARCHAR(100) NOT NULL,
   division        VARCHAR(100) NOT NULL,
   postal_code     VARCHAR(10),
-  created_at      TIMESTAMP DEFAULT NOW(),
-  updated_at      TIMESTAMP DEFAULT NOW()
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
@@ -170,7 +170,7 @@ CREATE TABLE IF NOT EXISTS user_documents (
   is_latest       BOOLEAN DEFAULT TRUE,   -- only latest = TRUE
   ocr_data        JSONB,                  -- extracted text from doc
   liveness_score  DECIMAL(5,2),          -- selfie only: confidence %
-  uploaded_at     TIMESTAMP DEFAULT NOW()
+  uploaded_at     TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
@@ -187,8 +187,8 @@ CREATE TABLE IF NOT EXISTS nominees (
                   CHECK (share_percent > 0 AND share_percent <= 100),
   contact         VARCHAR(20),
   nid_skipped     BOOLEAN DEFAULT FALSE,
-  created_at      TIMESTAMP DEFAULT NOW(),
-  updated_at      TIMESTAMP DEFAULT NOW()
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
@@ -213,7 +213,7 @@ CREATE TABLE IF NOT EXISTS nominee_documents (
   version         INTEGER DEFAULT 1,
   is_latest       BOOLEAN DEFAULT TRUE,
   ocr_data        JSONB,
-  uploaded_at     TIMESTAMP DEFAULT NOW()
+  uploaded_at     TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
@@ -230,8 +230,8 @@ CREATE TABLE IF NOT EXISTS bo_accounts (
   permission_cash         BOOLEAN DEFAULT TRUE,
   permission_margin       BOOLEAN DEFAULT TRUE,
   permission_foreign      BOOLEAN DEFAULT FALSE,
-  created_at              TIMESTAMP DEFAULT NOW(),
-  updated_at              TIMESTAMP DEFAULT NOW()
+  created_at              TIMESTAMPTZ DEFAULT NOW(),
+  updated_at              TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
@@ -268,7 +268,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   note            TEXT,
   meta            JSONB,        -- extra info e.g. changed fields
   ip_address      VARCHAR(45),
-  created_at      TIMESTAMP DEFAULT NOW()
+  created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
@@ -283,7 +283,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   title           VARCHAR(150),
   message         TEXT NOT NULL,
   is_read         BOOLEAN DEFAULT FALSE,
-  sent_at         TIMESTAMP DEFAULT NOW()
+  sent_at         TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================

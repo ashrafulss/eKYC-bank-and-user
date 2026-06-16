@@ -1,7 +1,11 @@
 import crypto from "crypto"; // 🌟 CRITICAL: Add this native Node.js import at the top
 import nodemailer from "nodemailer";
 import { AuthRepository } from "./auth.repository.js";
-import { signUserToken } from "../../../utils/jwt.js";
+import {
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+} from "../../../utils/jwt.js";
 
 export class AuthService {
   private authRepository = new AuthRepository();
@@ -82,17 +86,9 @@ export class AuthService {
   async validateOTPVerification(mobile: string, otpCode: string) {
     const record = await this.authRepository.getLatestUnverifiedOTP(mobile);
 
-    if (!record) {
-      throw new Error("NO_RECORD");
-    }
-
-    if (record.attempts >= 3) {
-      throw new Error("ATTEMPTS_EXCEEDED");
-    }
-
-    if (new Date() > new Date(record.expires_at)) {
-      throw new Error("EXPIRED");
-    }
+    if (!record) throw new Error("NO_RECORD");
+    if (record.attempts >= 3) throw new Error("ATTEMPTS_EXCEEDED");
+    if (new Date() > new Date(record.expires_at)) throw new Error("EXPIRED");
 
     const hashedInput = crypto
       .createHash("sha256")
@@ -109,12 +105,45 @@ export class AuthService {
       mobile,
     );
 
-    // 🌟 Generate JWT token
-    const token = signUserToken({ id: user.id, type: "user" });
+    const accessToken = signAccessToken({ id: user.id, type: "customer" });
+    const refreshToken = signRefreshToken({ id: user.id, type: "customer" });
 
-    // 🌟 Save session in DB
-    await this.authRepository.createUserSession(user.id, token);
+    await this.authRepository.createUserSession(user.id, refreshToken);
 
-    return { user, token };
+    return { user, accessToken, refreshToken };
+  }
+
+  async refreshUserToken(refreshToken: string) {
+    // 1. Verify JWT signature/expiry
+    let decoded;
+    try {
+      decoded = verifyRefreshToken(refreshToken);
+    } catch {
+      throw new Error("INVALID_REFRESH_TOKEN");
+    }
+
+    // 2. Check it still exists in DB (not revoked, not already rotated)
+    const session = await this.authRepository.findValidSession(refreshToken);
+    if (!session) {
+      // Possible theft/reuse — revoke everything for this user as a safety measure
+      await this.authRepository.deleteAllUserSessions(decoded.id);
+      throw new Error("SESSION_REVOKED");
+    }
+
+    // 3. Rotate — delete old, issue new
+    await this.authRepository.deleteSession(refreshToken);
+
+    const newAccessToken = signAccessToken({
+      id: decoded.id,
+      type: "customer",
+    });
+    const newRefreshToken = signRefreshToken({
+      id: decoded.id,
+      type: "customer",
+    });
+
+    await this.authRepository.createUserSession(decoded.id, newRefreshToken);
+
+    return { accessToken: newAccessToken, refreshToken: newRefreshToken };
   }
 }

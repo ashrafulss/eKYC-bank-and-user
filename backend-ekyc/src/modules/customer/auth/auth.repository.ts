@@ -76,13 +76,36 @@ export class AuthRepository {
   }
 
   // Save JWT token into user_sessions table
-  async createUserSession(userId: string, tokenHash: string) {
+
+  async createUserSession(userId: string, refreshToken: string) {
     const query = `
     INSERT INTO user_sessions (user_id, token_hash, expires_at)
-    VALUES ($1, $2, NOW() + INTERVAL '7 days')
+    VALUES ($1, $2, NOW() + INTERVAL '24 hours')
     RETURNING *;
   `;
-    const result = await pool.query(query, [userId, tokenHash]);
+    const result = await pool.query(query, [userId, refreshToken]);
     return result.rows[0];
+  }
+
+  // Find a valid (not expired) session by refresh token
+  async findValidSession(refreshToken: string) {
+    const query = `
+    SELECT * FROM user_sessions
+    WHERE token_hash = $1 AND expires_at > NOW()
+  `;
+    const result = await pool.query(query, [refreshToken]);
+    return result.rows[0] || null;
+  }
+
+  // Delete a specific session (used during rotation + logout)
+  async deleteSession(refreshToken: string) {
+    await pool.query("DELETE FROM user_sessions WHERE token_hash = $1", [
+      refreshToken,
+    ]);
+  }
+
+  // Delete ALL sessions for a user (used if token reuse/theft is detected)
+  async deleteAllUserSessions(userId: string) {
+    await pool.query("DELETE FROM user_sessions WHERE user_id = $1", [userId]);
   }
 }

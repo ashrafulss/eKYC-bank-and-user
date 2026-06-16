@@ -42,7 +42,30 @@ export const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
 
   ApiResponse.ok(
     res,
-    { user: result.user, token: result.token },
+    {
+      user: result.user,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    },
     "Mobile number verified successfully",
   );
 });
+
+export const refreshToken = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      throw new BadRequestError("Refresh token is required");
+    }
+
+    let result;
+    try {
+      result = await authService.refreshUserToken(refreshToken);
+    } catch (error) {
+      throw mapServiceError(error);
+    }
+
+    ApiResponse.ok(res, result, "Token refreshed successfully");
+  },
+);

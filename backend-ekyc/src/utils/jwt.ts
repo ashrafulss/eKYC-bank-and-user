@@ -1,18 +1,28 @@
 import jwt, { type SignOptions } from "jsonwebtoken";
 
-const SECRET = process.env.JWT_SECRET || "secret";
-const EXPIRES: SignOptions["expiresIn"] =
-  (process.env.JWT_EXPIRES_IN as SignOptions["expiresIn"]) ?? "7d";
+const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || "access_secret";
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "refresh_secret";
 
-interface JwtUserPayload {
+const ACCESS_EXPIRES_SECONDS = 120; // 30 minutes
+const REFRESH_EXPIRES_SECONDS = 86400; // 24 hours
+
+export interface JwtCustomerPayload {
   id: string;
-  type: "user";
+  type: "customer";
 }
 
-export const signUserToken = (payload: JwtUserPayload): string => {
-  const options: SignOptions = { expiresIn: EXPIRES };
-  return jwt.sign(payload, SECRET, options);
+export const signAccessToken = (payload: JwtCustomerPayload): string => {
+  const options: SignOptions = { expiresIn: ACCESS_EXPIRES_SECONDS };
+  return jwt.sign(payload, ACCESS_SECRET, options);
 };
 
-export const verifyToken = (token: string): JwtUserPayload =>
-  jwt.verify(token, SECRET) as JwtUserPayload;
+export const signRefreshToken = (payload: JwtCustomerPayload): string => {
+  const options: SignOptions = { expiresIn: REFRESH_EXPIRES_SECONDS };
+  return jwt.sign(payload, REFRESH_SECRET, options);
+};
+
+export const verifyAccessToken = (token: string): JwtCustomerPayload =>
+  jwt.verify(token, ACCESS_SECRET) as JwtCustomerPayload;
+
+export const verifyRefreshToken = (token: string): JwtCustomerPayload =>
+  jwt.verify(token, REFRESH_SECRET) as JwtCustomerPayload;
