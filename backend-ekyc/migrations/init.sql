@@ -1,28 +1,134 @@
 -- ============================================================
 -- eKYC Full Database Migration
--- Version: 001
--- Description: Initial schema for eKYC user + bank admin portal
+-- Version: 004
+-- Description: Core schema with comprehensive ENUM type safety
 -- ============================================================
 
 -- Enable UUID generation
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================================
--- 1. USERS (applicants)
+-- 1. ENUMS & TYPE DEFINITIONS (Must be defined first)
+-- ============================================================
+
+-- User Wizard Progression Pipeline
+CREATE TYPE registration_step AS ENUM (
+  'mobile_verified',
+  'nid_verified',
+  'selfie_verified',
+  'basic_info_done',
+  'nominee_done',
+  'review_done',
+  'submitted'
+);
+
+-- User Account System States
+CREATE TYPE account_status AS ENUM (
+  'active',
+  'suspended',
+  'deleted'
+);
+
+-- Back-Office Staff Privileges
+CREATE TYPE staff_role AS ENUM (
+  'maker',
+  'checker',
+  'admin'
+);
+
+-- Core Application Workflow States
+CREATE TYPE application_status AS ENUM (
+  'pending',
+  'under_review',
+  'checker_approved',
+  'checker_rejected',
+  'info_requested',
+  'resubmitted',
+  'approved',
+  'rejected'
+);
+
+-- Demographics Metadata
+CREATE TYPE biological_gender AS ENUM (
+  'male',
+  'female',
+  'other'
+);
+
+-- Valid Identity & Supporting Documentation Classifications
+CREATE TYPE applicant_document_type AS ENUM (
+  'nid_front',
+  'nid_back',
+  'passport_front',
+  'passport_back',
+  'driving_licence_front',
+  'driving_licence_back',
+  'proof_of_address',
+  'selfie'
+);
+
+-- Valid Nominee Core Document Variations
+CREATE TYPE nominee_document_type AS ENUM (
+  'nid_front',
+  'nid_back',
+  'passport_front',
+  'passport_back'
+);
+
+-- Actor Domains within Security Subsystems
+CREATE TYPE system_actor_type AS ENUM (
+  'user',
+  'staff',
+  'system'
+);
+
+-- System Authorization Roles inside Audit Subsystems
+CREATE TYPE system_actor_role AS ENUM (
+  'applicant',
+  'maker',
+  'checker',
+  'admin',
+  'system'
+);
+
+-- Unified Audit Log Event Categories
+CREATE TYPE audit_action_type AS ENUM (
+  'submitted',
+  'opened',
+  'checker_approved',
+  'checker_rejected',
+  'info_requested',
+  'resubmitted',
+  'document_uploaded',
+  'maker_approved',
+  'maker_rejected',
+  'approved',
+  'rejected'
+);
+
+-- Alert Protocols
+CREATE TYPE notification_transport_type AS ENUM (
+  'sms',
+  'email',
+  'in_app'
+);
+
+-- ============================================================
+-- 2. USERS (applicants)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS users (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   mobile        VARCHAR(20) UNIQUE NOT NULL,
   email         VARCHAR(100) UNIQUE,
   is_verified   BOOLEAN DEFAULT FALSE,
-  status        VARCHAR(20) DEFAULT 'active'
-                CHECK (status IN ('active', 'suspended', 'deleted')),
+  status        account_status DEFAULT 'active',
+  current_step  registration_step DEFAULT 'mobile_verified',
   created_at    TIMESTAMPTZ DEFAULT NOW(),
   updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
--- 2. OTP VERIFICATION
+-- 3. OTP VERIFICATION
 -- ============================================================
 CREATE TABLE IF NOT EXISTS otp_verification (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -36,7 +142,7 @@ CREATE TABLE IF NOT EXISTS otp_verification (
 );
 
 -- ============================================================
--- 3. USER SESSIONS
+-- 4. USER SESSIONS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS user_sessions (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -49,15 +155,14 @@ CREATE TABLE IF NOT EXISTS user_sessions (
 );
 
 -- ============================================================
--- 4. BANK STAFF
+-- 5. BANK STAFF
 -- ============================================================
 CREATE TABLE IF NOT EXISTS bank_staff (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name          VARCHAR(150) NOT NULL,
   email         VARCHAR(100) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
-  role          VARCHAR(20) NOT NULL
-                CHECK (role IN ('checker', 'maker', 'admin')),
+  role          staff_role NOT NULL,
   branch        VARCHAR(100),
   department    VARCHAR(100),
   is_active     BOOLEAN DEFAULT TRUE,
@@ -68,7 +173,7 @@ CREATE TABLE IF NOT EXISTS bank_staff (
 );
 
 -- ============================================================
--- 5. STAFF SESSIONS
+-- 6. STAFF SESSIONS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS staff_sessions (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -81,12 +186,12 @@ CREATE TABLE IF NOT EXISTS staff_sessions (
 );
 
 -- ============================================================
--- 6. APPLICATION CODE SEQUENCE
+-- 7. APPLICATION CODE SEQUENCE
 -- ============================================================
 CREATE SEQUENCE IF NOT EXISTS app_code_seq START 1000;
 
 -- ============================================================
--- 7. APPLICATIONS
+-- 8. APPLICATIONS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS applications (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -94,23 +199,13 @@ CREATE TABLE IF NOT EXISTS applications (
                   'KYC-' || EXTRACT(YEAR FROM NOW())::TEXT || '-' ||
                   LPAD(nextval('app_code_seq')::TEXT, 6, '0'),
   user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  status        VARCHAR(30) DEFAULT 'pending'
-                CHECK (status IN (
-                  'pending',
-                  'under_review',
-                  'checker_approved',
-                  'checker_rejected',
-                  'info_requested',
-                  'resubmitted',
-                  'approved',
-                  'rejected'
-                )),
+  status        application_status DEFAULT 'pending',
   submitted_at  TIMESTAMPTZ DEFAULT NOW(),
   updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
--- 8. PERSONAL INFO (1 to 1 with application)
+-- 9. PERSONAL INFO (1 to 1 with application)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS personal_info (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -118,8 +213,7 @@ CREATE TABLE IF NOT EXISTS personal_info (
   first_name      VARCHAR(100) NOT NULL,
   last_name       VARCHAR(100) NOT NULL,
   date_of_birth   DATE NOT NULL,
-  gender          VARCHAR(10)
-                  CHECK (gender IN ('male', 'female', 'other')),
+  gender          biological_gender NOT NULL,
   nationality     VARCHAR(50),
   mobile          VARCHAR(20),
   email           VARCHAR(100),
@@ -128,7 +222,7 @@ CREATE TABLE IF NOT EXISTS personal_info (
 );
 
 -- ============================================================
--- 9. ADDRESS INFO (1 to 1 with application)
+-- 10. ADDRESS INFO (1 to 1 with application)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS address_info (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -144,24 +238,12 @@ CREATE TABLE IF NOT EXISTS address_info (
 );
 
 -- ============================================================
--- 10. USER DOCUMENTS
---     (NID, passport, driving licence, selfie, proof of address)
---     versioned — old uploads kept, is_latest = FALSE
+-- 11. USER DOCUMENTS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS user_documents (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   application_id  UUID NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
-  doc_type        VARCHAR(40) NOT NULL
-                  CHECK (doc_type IN (
-                    'nid_front',
-                    'nid_back',
-                    'passport_front',
-                    'passport_back',
-                    'driving_licence_front',
-                    'driving_licence_back',
-                    'proof_of_address',
-                    'selfie'
-                  )),
+  doc_type        applicant_document_type NOT NULL,
   file_url        VARCHAR(500) NOT NULL,
   file_name       VARCHAR(255),
   file_size       INTEGER,                -- bytes
@@ -174,7 +256,7 @@ CREATE TABLE IF NOT EXISTS user_documents (
 );
 
 -- ============================================================
--- 11. NOMINEES (1 application → many nominees)
+-- 12. NOMINEES (1 application → many nominees)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS nominees (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -192,20 +274,12 @@ CREATE TABLE IF NOT EXISTS nominees (
 );
 
 -- ============================================================
--- 12. NOMINEE DOCUMENTS (1 nominee → many documents)
---     separate from user_documents — different owner, different fields
---     versioned — same as user_documents
+-- 13. NOMINEE DOCUMENTS (1 nominee → many documents)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS nominee_documents (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   nominee_id      UUID NOT NULL REFERENCES nominees(id) ON DELETE CASCADE,
-  doc_type        VARCHAR(30) NOT NULL
-                  CHECK (doc_type IN (
-                    'nid_front',
-                    'nid_back',
-                    'passport_front',
-                    'passport_back'
-                  )),
+  doc_type        nominee_document_type NOT NULL,
   file_url        VARCHAR(500) NOT NULL,
   file_name       VARCHAR(255),
   file_size       INTEGER,
@@ -217,7 +291,7 @@ CREATE TABLE IF NOT EXISTS nominee_documents (
 );
 
 -- ============================================================
--- 13. BO ACCOUNTS (1 to 1 with application)
+-- 14. BO ACCOUNTS (1 to 1 with application)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS bo_accounts (
   id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -235,36 +309,15 @@ CREATE TABLE IF NOT EXISTS bo_accounts (
 );
 
 -- ============================================================
--- 14. AUDIT LOGS
---     tracks every action by user / staff / system
---     merged with kyc_workflow — one table for everything
+-- 15. AUDIT LOGS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS audit_logs (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   application_id  UUID REFERENCES applications(id) ON DELETE SET NULL,
   actor_id        UUID NOT NULL,
-  actor_type      VARCHAR(20) NOT NULL
-                  CHECK (actor_type IN ('user', 'staff', 'system')),
-  actor_role      VARCHAR(20)
-                  CHECK (actor_role IN (
-                    'applicant',
-                    'checker',
-                    'maker',
-                    'admin',
-                    'system'
-                  )),
-  action          VARCHAR(50) NOT NULL
-                  CHECK (action IN (
-                    'submitted',
-                    'opened',
-                    'checker_approved',
-                    'checker_rejected',
-                    'info_requested',
-                    'resubmitted',
-                    'document_uploaded',
-                    'maker_approved',
-                    'maker_rejected'
-                  )),
+  actor_type      system_actor_type NOT NULL,
+  actor_role      system_actor_role,
+  action          audit_action_type NOT NULL,
   note            TEXT,
   meta            JSONB,        -- extra info e.g. changed fields
   ip_address      VARCHAR(45),
@@ -272,14 +325,13 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 
 -- ============================================================
--- 15. NOTIFICATIONS
+-- 16. NOTIFICATIONS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS notifications (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         UUID REFERENCES users(id) ON DELETE CASCADE,
   application_id  UUID REFERENCES applications(id) ON DELETE CASCADE,
-  type            VARCHAR(20) NOT NULL
-                  CHECK (type IN ('sms', 'email', 'in_app')),
+  type            notification_transport_type NOT NULL,
   title           VARCHAR(150),
   message         TEXT NOT NULL,
   is_read         BOOLEAN DEFAULT FALSE,
@@ -287,77 +339,44 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 -- ============================================================
--- INDEXES
+-- INDEXES & PERFORMANCE OPTIMIZATIONS
 -- ============================================================
 
--- users
-CREATE INDEX IF NOT EXISTS idx_users_mobile
-  ON users(mobile);
-CREATE INDEX IF NOT EXISTS idx_users_email
-  ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_mobile ON users(mobile);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
--- otp_verification
-CREATE INDEX IF NOT EXISTS idx_otp_mobile
-  ON otp_verification(mobile);
-CREATE INDEX IF NOT EXISTS idx_otp_expires
-  ON otp_verification(expires_at);
+CREATE INDEX IF NOT EXISTS idx_otp_mobile ON otp_verification(mobile);
+CREATE INDEX IF NOT EXISTS idx_otp_expires ON otp_verification(expires_at);
 
--- user_sessions
-CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id
-  ON user_sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_sessions_expires
-  ON user_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_expires ON user_sessions(expires_at);
 
--- staff_sessions
-CREATE INDEX IF NOT EXISTS idx_staff_sessions_staff_id
-  ON staff_sessions(staff_id);
-CREATE INDEX IF NOT EXISTS idx_staff_sessions_expires
-  ON staff_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_staff_sessions_staff_id ON staff_sessions(staff_id);
+CREATE INDEX IF NOT EXISTS idx_staff_sessions_expires ON staff_sessions(expires_at);
 
--- applications
-CREATE INDEX IF NOT EXISTS idx_applications_user_id
-  ON applications(user_id);
-CREATE INDEX IF NOT EXISTS idx_applications_status
-  ON applications(status);
-CREATE INDEX IF NOT EXISTS idx_applications_app_code
-  ON applications(app_code);
-CREATE INDEX IF NOT EXISTS idx_applications_submitted_at
-  ON applications(submitted_at DESC);
+CREATE INDEX IF NOT EXISTS idx_applications_user_id ON applications(user_id);
+CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);
+CREATE INDEX IF NOT EXISTS idx_applications_app_code ON applications(app_code);
+CREATE INDEX IF NOT EXISTS idx_applications_submitted_at ON applications(submitted_at DESC);
 
--- user_documents
-CREATE INDEX IF NOT EXISTS idx_user_docs_app_id
-  ON user_documents(application_id);
-CREATE INDEX IF NOT EXISTS idx_user_docs_type
-  ON user_documents(doc_type);
-CREATE INDEX IF NOT EXISTS idx_user_docs_latest
-  ON user_documents(application_id, doc_type)
-  WHERE is_latest = TRUE;
+CREATE INDEX IF NOT EXISTS idx_user_docs_app_id ON user_documents(application_id);
+CREATE INDEX IF NOT EXISTS idx_user_docs_type ON user_documents(doc_type);
+CREATE INDEX IF NOT EXISTS idx_user_docs_latest ON user_documents(application_id, doc_type) WHERE is_latest = TRUE;
 
--- nominees
-CREATE INDEX IF NOT EXISTS idx_nominees_app_id
-  ON nominees(application_id);
+-- GIN Indexes for high-speed indexing within the unstructured OCR JSON blocks
+CREATE INDEX IF NOT EXISTS idx_user_docs_ocr ON user_documents USING gin (ocr_data);
+CREATE INDEX IF NOT EXISTS idx_nom_docs_ocr ON nominee_documents USING gin (ocr_data);
 
--- nominee_documents
-CREATE INDEX IF NOT EXISTS idx_nominee_docs_nominee_id
-  ON nominee_documents(nominee_id);
-CREATE INDEX IF NOT EXISTS idx_nominee_docs_latest
-  ON nominee_documents(nominee_id, doc_type)
-  WHERE is_latest = TRUE;
+CREATE INDEX IF NOT EXISTS idx_nominees_app_id ON nominees(application_id);
+CREATE INDEX IF NOT EXISTS idx_nominee_docs_nominee_id ON nominee_documents(nominee_id);
+CREATE INDEX IF NOT EXISTS idx_nominee_docs_latest ON nominee_documents(nominee_id, doc_type) WHERE is_latest = TRUE;
 
--- audit_logs
-CREATE INDEX IF NOT EXISTS idx_audit_logs_app_id
-  ON audit_logs(application_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_id
-  ON audit_logs(actor_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at
-  ON audit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_app_id ON audit_logs(application_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_id ON audit_logs(actor_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);
 
--- notifications
-CREATE INDEX IF NOT EXISTS idx_notifications_user_id
-  ON notifications(user_id);
-CREATE INDEX IF NOT EXISTS idx_notifications_unread
-  ON notifications(user_id)
-  WHERE is_read = FALSE;
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id) WHERE is_read = FALSE;
 
 -- ============================================================
 -- AUTO UPDATE updated_at TRIGGER FUNCTION
@@ -370,39 +389,30 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Apply to all tables that have updated_at
+-- Apply Triggers
 CREATE OR REPLACE TRIGGER trg_users_updated_at
-  BEFORE UPDATE ON users
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 CREATE OR REPLACE TRIGGER trg_bank_staff_updated_at
-  BEFORE UPDATE ON bank_staff
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  BEFORE UPDATE ON bank_staff FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 CREATE OR REPLACE TRIGGER trg_applications_updated_at
-  BEFORE UPDATE ON applications
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  BEFORE UPDATE ON applications FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 CREATE OR REPLACE TRIGGER trg_personal_info_updated_at
-  BEFORE UPDATE ON personal_info
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  BEFORE UPDATE ON personal_info FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 CREATE OR REPLACE TRIGGER trg_address_info_updated_at
-  BEFORE UPDATE ON address_info
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  BEFORE UPDATE ON address_info FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 CREATE OR REPLACE TRIGGER trg_nominees_updated_at
-  BEFORE UPDATE ON nominees
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  BEFORE UPDATE ON nominees FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 CREATE OR REPLACE TRIGGER trg_bo_accounts_updated_at
-  BEFORE UPDATE ON bo_accounts
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  BEFORE UPDATE ON bo_accounts FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- ============================================================
 -- SEED: DEFAULT ADMIN STAFF
--- password: Admin@1234 (bcrypt hashed)
--- CHANGE THIS AFTER FIRST LOGIN
 -- ============================================================
 INSERT INTO bank_staff (
   name,
