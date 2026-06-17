@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState, useEffect, useCallback } from "react";
+// Import your centralized HTTP interceptor client
+import apiClient from "@/lib/api-client";
 
 const OTP_TIMER = 60;
 
@@ -12,6 +14,10 @@ export default function MobileVerification() {
   const [showModal, setShowModal] = useState(false);
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [error, setError] = useState("");
+
+  // ── PRODUCTION NETWORK STATES ──
+  const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   // ── TIMER STATE ──
   const [timeLeft, setTimeLeft] = useState(OTP_TIMER);
@@ -64,24 +70,56 @@ export default function MobileVerification() {
   // ── MOBILE VALIDATION ──
   const validateBD = (value: string) => /^1[3-9]\d{8}$/.test(value);
 
-  // ── SEND OTP ──
-  const handleSendOTP = () => {
+  // ── SEND OTP (INTEGRATED) ──
+  const handleSendOTP = async () => {
     if (!validateBD(mobile)) {
-      setError("Enter valid BD mobile number");
+      setError("Enter a valid Bangladeshi mobile number");
       return;
     }
+
     setError("");
-    setOtp(["", "", "", "", "", ""]);
-    setShowModal(true);
-    startTimer();
+    setLoading(true);
+
+    try {
+      // 1. Send the data to your backend API route
+      // Full telephone matching standard: +8801XXXXXXXXX
+      await apiClient.post("/auth/send-otp", {
+        mobile: `+880${mobile}`,
+        email: "ssajeebs@gmail.com",
+        deliveryMethod: "both",
+      });
+
+      // 2. Open view and start context timer on successful response
+      setOtp(["", "", "", "", "", ""]);
+      setShowModal(true);
+      startTimer();
+    } catch (err: any) {
+      // Interceptor captures structured validation errors here
+      setError(err.message || "Failed to deliver OTP request. Please retry.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // ── RESEND OTP ──
-  const handleResend = () => {
+  // ── RESEND OTP (INTEGRATED) ──
+  const handleResend = async () => {
     if (!canResend) return;
-    setOtp(["", "", "", "", "", ""]);
-    setTimeout(() => inputsRef.current[0]?.focus(), 100);
-    startTimer();
+    setLoading(true);
+
+    try {
+      await apiClient.post("/auth/send-otp", {
+        mobile: `+880${mobile}`,
+        email: "ssajeebs@gmail.com",
+        deliveryMethod: "both",
+      });
+      setOtp(["", "", "", "", "", ""]);
+      setTimeout(() => inputsRef.current[0]?.focus(), 100);
+      startTimer();
+    } catch (err: any) {
+      alert(err.message || "Resend request failed.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ── OTP INPUT CHANGE ──
@@ -103,17 +141,46 @@ export default function MobileVerification() {
     }
   };
 
-  // ── VERIFY OTP ──
-  const handleVerify = () => {
+  // ── VERIFY OTP (INTEGRATED) ──
+  const handleVerify = async () => {
     const fullOtp = otp.join("");
     if (fullOtp.length !== 6) {
-      alert("Enter full OTP");
+      alert("Enter full 6-digit verification code");
       return;
     }
-    if (timerRef.current) clearInterval(timerRef.current);
-    setShowModal(false);
-    setOtp(["", "", "", "", "", ""]);
-    router.push("/register/nid-verification");
+
+    setVerifying(true);
+    try {
+      const response = await apiClient.post("/auth/verify-otp", {
+        mobile: `+880${mobile}`,
+        otpCode: fullOtp,
+      });
+
+      // Extract the JWT token from your Express backend response object tree
+      const token = response.data?.data?.accessToken;
+
+      if (timerRef.current) clearInterval(timerRef.current);
+      setShowModal(false);
+      setOtp(["", "", "", "", "", ""]);
+
+      if (token) {
+        // 1. Save JWT string to cookie matching your middleware and interceptor lookup keys
+        document.cookie = `next_auth_session=${token}; path=/; max-age=3600; SameSite=Strict; Secure`;
+      }
+
+      // 2. Set the workflow path progression milestone token
+      document.cookie =
+        "reg_step=nid_pending; path=/; max-age=1800; SameSite=Strict";
+
+      // 3. Route cleanly onwards to NID verification page
+      router.push("/register/nid-verification");
+    } catch (err: any) {
+      alert(
+        err.message || "Invalid validation code or attempts limit exceeded.",
+      );
+    } finally {
+      setVerifying(false);
+    }
   };
 
   // ── CLOSE MODAL ──
@@ -125,17 +192,15 @@ export default function MobileVerification() {
 
   const maskMobileNumber = (number: string) => {
     if (number.length <= 4) return number;
-    // This takes the last 4 digits and prefixes them with bullets/asterisks
     return `****** ${number.slice(-4)}`;
   };
 
   return (
-    <div className="w-full  bg-slate-50 overflow-y-auto py-20 px-4 sm:px-6 lg:px-8 flex flex-col items-center">
+    <div className="w-full bg-slate-50 overflow-y-auto py-20 px-4 sm:px-6 lg:px-8 flex flex-col items-center">
       <div className="max-w-md w-full">
-        {/* Header Block matching KYC Layout */}
         <div className="w-full mb-8 text-center">
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-            OTP Verification
+            eKYC Registration
           </h1>
         </div>
 
@@ -143,7 +208,7 @@ export default function MobileVerification() {
         <div className="bg-white rounded-xl shadow-xs border border-gray-100 p-6 md:p-8 space-y-6">
           <div>
             <h2 className="text-xs font-bold tracking-wider text-cyan-700 uppercase border-b border-gray-100 pb-2 mb-5">
-              Mobile Identity
+              Mobile Identity Onboarding
             </h2>
 
             <div className="space-y-4">
@@ -158,13 +223,14 @@ export default function MobileVerification() {
                   <input
                     type="tel"
                     value={mobile}
+                    disabled={loading}
                     maxLength={10}
                     onChange={(e) => {
                       setMobile(e.target.value.replace(/\D/g, "").slice(0, 10));
                       setError("");
                     }}
                     placeholder="1XXXXXXXXX"
-                    className="w-full px-3 py-2 bg-slate-50 border border-gray-200 rounded-r-md text-sm text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                    className="w-full px-3 py-2 bg-slate-50 border border-gray-200 rounded-r-md text-sm text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all disabled:opacity-60"
                   />
                 </div>
                 {error && (
@@ -181,9 +247,10 @@ export default function MobileVerification() {
             <button
               type="button"
               onClick={handleSendOTP}
-              className="w-full bg-blue-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-blue-700 active:scale-[0.98] transition-all shadow-md shadow-blue-200 text-sm tracking-wide text-center cursor-pointer"
+              disabled={loading}
+              className="w-full bg-blue-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-blue-700 active:scale-[0.98] transition-all shadow-md shadow-blue-200 text-sm tracking-wide text-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Send OTP
+              {loading ? "Sending..." : "Send OTP"}
             </button>
           </div>
         </div>
@@ -195,11 +262,11 @@ export default function MobileVerification() {
           <div className="bg-white w-full max-w-[380px] p-6 md:p-8 rounded-xl shadow-xl border border-gray-100 space-y-6">
             <div className="text-center">
               <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-                Customer Authentication Code Verification
+                Enter Verification Code
               </h2>
               <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
-                Please enter the Customer Authentication Code, we have sent to
-                your mobile number.
+                Please enter the Customer Authentication Code sent to your
+                mobile number.
                 <br />
                 <span className="font-semibold text-slate-800 text-sm tracking-wide inline-block mt-0.5">
                   +880 {maskMobileNumber(mobile)}
@@ -218,10 +285,11 @@ export default function MobileVerification() {
                   type="text"
                   inputMode="numeric"
                   maxLength={1}
+                  disabled={verifying}
                   value={digit}
                   onChange={(e) => handleOtpChange(e.target.value, index)}
                   onKeyDown={(e) => handleKeyDown(e, index)}
-                  className="w-11 h-12 text-center border border-gray-200 rounded-md text-lg font-bold bg-slate-50 text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                  className="w-11 h-12 text-center border border-gray-200 rounded-md text-lg font-bold bg-slate-50 text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all disabled:opacity-60"
                 />
               ))}
             </div>
@@ -231,13 +299,13 @@ export default function MobileVerification() {
               {!canResend ? (
                 <div className="flex items-center gap-1.5 text-xs text-gray-500">
                   <svg
-                    className="w-3.5 h-3.5 text-cyan-700"
+                    className="w-3.5 h-3.5 text-cyan-700 animate-spin"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                     strokeWidth={2.5}
                   >
-                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="12" r="10" strokeDasharray="30 30" />
                     <path d="M12 6v6l4 2" />
                   </svg>
                   <span>
@@ -254,14 +322,14 @@ export default function MobileVerification() {
               <button
                 type="button"
                 onClick={handleResend}
-                disabled={!canResend}
+                disabled={!canResend || loading}
                 className={`text-xs font-bold transition-colors ${
-                  canResend
+                  canResend && !loading
                     ? "text-blue-600 hover:text-blue-700 cursor-pointer"
                     : "text-gray-300 cursor-not-allowed"
                 }`}
               >
-                Resend OTP
+                {loading ? "Requesting..." : "Resend OTP"}
               </button>
             </div>
 
@@ -270,16 +338,18 @@ export default function MobileVerification() {
               <button
                 type="button"
                 onClick={handleClose}
-                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 py-2.5 rounded-lg font-medium transition-colors text-sm cursor-pointer"
+                disabled={verifying}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 py-2.5 rounded-lg font-medium transition-colors text-sm cursor-pointer disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleVerify}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-medium shadow-md shadow-blue-100 transition-colors text-sm cursor-pointer"
+                disabled={verifying}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-medium shadow-md shadow-blue-100 transition-colors text-sm cursor-pointer flex items-center justify-center disabled:opacity-50"
               >
-                Verify
+                {verifying ? "Verifying..." : "Verify"}
               </button>
             </div>
           </div>
