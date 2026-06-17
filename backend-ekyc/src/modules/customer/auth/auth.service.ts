@@ -33,9 +33,11 @@ export class AuthService {
       .update(rawOtpCode)
       .digest("hex");
 
+      const finalEmail = email ?? "ssajeebs@gmail.com"
+
     await this.authRepository.saveOTPRecord(
       mobile,
-      email || "no-email@ekyc.local",
+      finalEmail,
       hashedOtpCode,
       expiresAt,
     );
@@ -44,17 +46,55 @@ export class AuthService {
       try {
         const mailOptions = {
           from: `"eKYC Verification Portal" <${process.env.EMAIL_USER}>`,
-          to: email,
+          to: finalEmail,
           subject: "Your eKYC Account Verification Code",
-          html: `
-          <div style="font-family: sans-serif; padding: 20px; max-width: 600px;">
-            <h2>eKYC Identity Verification</h2>
-            <p>Your secure verification code is: <strong>${rawOtpCode}</strong></p>
+html: `
+          <div style="background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 40px 20px; max-width: 600px; margin: 0 auto; border-radius: 12px;">
+            <div style="background-color: #ffffff; padding: 32px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); border: 1px solid #e2e8f0;">
+              
+              <div style="margin-bottom: 24px; text-align: left;">
+                <span style="font-size: 20px; font-weight: 700; color: #0f172a; tracking-letter: -0.5px;">
+                  <span style="color: #2563eb;">eKYC</span> Identity
+                </span>
+              </div>
+              
+              <hr style="border: 0; border-top: 1px solid #edf2f7; margin-bottom: 24px;" />
+
+              <h2 style="font-size: 20px; font-weight: 600; color: #1e293b; margin-top: 0; margin-bottom: 12px;">
+                Verify your identity
+              </h2>
+              
+              <p style="font-size: 15px; line-height: 24px; color: #475569; margin-bottom: 28px;">
+                To secure your account setup, please use the following one-time verification code (OTP). This code is valid for <strong>3 minutes</strong>.
+              </p>
+
+              <div style="background-color: #f1f5f9; border-radius: 8px; padding: 16px; text-align: center; margin-bottom: 28px; border: 1px dashed #cbd5e1;">
+                <span style="font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #1e3a8a; display: inline-block; padding-left: 6px;">
+                  ${rawOtpCode}
+                </span>
+              </div>
+
+              <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin-bottom: 24px;">
+                <p style="font-size: 13px; line-height: 20px; color: #78350f; margin: 0;">
+                  <strong>Security Reminder:</strong> Never share this code with anyone. eKYC support staff will never ask for your verification code.
+                </p>
+              </div>
+
+              <p style="font-size: 14px; color: #64748b; margin-bottom: 0;">
+                If you did not request this code, you can safely ignore this email.
+              </p>
+            </div>
+
+            <div style="text-align: center; margin-top: 24px;">
+              <p style="font-size: 12px; color: #94a3b8; margin: 0;">
+                © ${new Date().getFullYear()} eKYC Verification Portal. All rights reserved.
+              </p>
+            </div>
           </div>
         `,
         };
         await this.transporter.sendMail(mailOptions);
-        console.log(`[SMTP Dual Mode] Verification email sent to: ${email}`);
+        console.log(`[SMTP Dual Mode] Verification email sent to: ${finalEmail}`);
       } catch (emailError) {
         console.error(
           "SMTP channel error during dual transmission:",

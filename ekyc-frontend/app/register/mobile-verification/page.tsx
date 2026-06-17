@@ -81,7 +81,6 @@ const formatTimeOnlySecond = (seconds: number) => {
     try {
       await authService.sendOtp({
         mobile: `+880${mobile}`,
-        email: "ssajeebs@gmail.com",
         deliveryMethod: "both",
       });
 
@@ -104,7 +103,6 @@ const formatTimeOnlySecond = (seconds: number) => {
     try {
       await authService.sendOtp({
         mobile: `+880${mobile}`,
-        email: "ssajeebs@gmail.com",
         deliveryMethod: "both",
       });
       setOtp(["", "", "", "", "", ""]);

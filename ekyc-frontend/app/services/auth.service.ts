@@ -3,7 +3,7 @@ import apiClient from "@/lib/api-client";
 // ── TYPES ──────────────────────────────────────────────────────
 export interface SendOtpPayload {
   mobile: string;
-  email: string;
+  email?: string;
   deliveryMethod: "sms" | "email" | "both";
 }
 

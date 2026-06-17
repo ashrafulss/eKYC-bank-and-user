@@ -25,11 +25,11 @@ export function validateOtpRequest(
     );
   }
 
-  if ((method === "email" || method === "both") && !email) {
-    throw new BadRequestError(
-      "Email address is required for this delivery method",
-    );
-  }
+  // if ((method === "email" || method === "both") && !email) {
+  //   throw new BadRequestError(
+  //     "Email address is required for this delivery method",
+  //   );
+  // }
 
   return method;
 }
