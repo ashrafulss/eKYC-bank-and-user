@@ -31,7 +31,7 @@ export default function Header({ completionPct }: HeaderProps) {
     }
   };
 
-  // Close dropdown on outside click
+ 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (
@@ -46,14 +46,17 @@ export default function Header({ completionPct }: HeaderProps) {
   }, []);
 
   const mobile = user?.mobile || "";
-  const initials = mobile.replace(/\D/g, "").slice(-2) || "??";
+  const name = user?.name || "";
+  const initials = name.trim()
+    ? name.trim().slice(0, 2).toUpperCase()
+    : mobile.replace(/\D/g, "").slice(-2) || "??";
 
   const showCompletion = typeof completionPct === "number";
 
   return (
     <header className="bg-white border-b border-gray-200 shrink-0 z-20">
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-        {/* Logo / Brand */}
+        
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-blue-900 flex items-center justify-center">
             <svg
@@ -75,7 +78,7 @@ export default function Header({ completionPct }: HeaderProps) {
           </span>
         </div>
 
-        {/* Profile completion bar — desktop only */}
+       
         {showCompletion && (
           <div className="hidden md:flex items-center gap-3 flex-1 max-w-xs mx-8">
             <span className="text-xs text-gray-500 whitespace-nowrap">
@@ -93,13 +96,13 @@ export default function Header({ completionPct }: HeaderProps) {
           </div>
         )}
 
-        {/* Right — profile dropdown */}
+        
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setDropdownOpen((o) => !o)}
             className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all"
-          >
-            {/* Avatar */}
+          > 
+        
             {user?.avatar ? (
               <img
                 src={user.avatar}
@@ -112,12 +115,12 @@ export default function Header({ completionPct }: HeaderProps) {
               </div>
             )}
 
-            {/* User display */}
+          
             <span className="text-xs font-medium text-gray-700 hidden sm:block">
               {user?.name || user?.mobile || "—"}
             </span>
 
-            {/* Chevron */}
+          
             <svg
               className={`w-3.5 h-3.5 text-gray-400 transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
               fill="none"
@@ -133,10 +136,10 @@ export default function Header({ completionPct }: HeaderProps) {
             </svg>
           </button>
 
-          {/* Dropdown */}
+        
           {dropdownOpen && (
             <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
-              {/* User info header */}
+            
               <div className="px-4 py-3 border-b border-gray-100">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-blue-900 text-white flex items-center justify-center text-sm font-bold shrink-0">
@@ -152,7 +155,7 @@ export default function Header({ completionPct }: HeaderProps) {
                   </div>
                 </div>
 
-                {/* Mini completion bar */}
+             
                 {showCompletion && (
                   <div className="mt-3">
                     <div className="flex justify-between text-[11px] text-gray-500 mb-1">
@@ -171,7 +174,7 @@ export default function Header({ completionPct }: HeaderProps) {
                 )}
               </div>
 
-              {/* Logout */}
+            
               <div className="border-t border-gray-100 px-2 pt-2 mt-1">
                 <button
                   onClick={handleLogout}

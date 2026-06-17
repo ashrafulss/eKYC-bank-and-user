@@ -80,3 +80,18 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
 
   ApiResponse.ok(res, undefined, "Logged out successfully");
 });
+
+export const getMe = asyncHandler(async (req: Request, res: Response) => {
+  const customerId = req.customer?.id;
+  if (!customerId) {
+    throw new BadRequestError("Customer not authenticated");
+  }
+
+  const profile = await authService.getUserProfile(customerId);
+  if (!profile) {
+    throw new BadRequestError("Customer profile not found");
+  }
+
+  ApiResponse.ok(res, { user: profile }, "Profile retrieved successfully");
+});
+

@@ -132,7 +132,35 @@ export class AuthService {
   }
 
   async logoutCustomer(refreshToken: string): Promise<void> {
-  if (!refreshToken) return;
-  await this.authRepository.deleteSession(refreshToken);
-}
+    if (!refreshToken) return;
+    await this.authRepository.deleteSession(refreshToken);
+  }
+
+  async getUserProfile(id: string) {
+    const row = await this.authRepository.findFullUserById(id);
+    if (!row) return null;
+
+    // Map database columns to the frontend expected User format
+    return {
+      id: row.id,
+      mobile: row.mobile,
+      name: row.first_name && row.last_name ? `${row.first_name} ${row.last_name}` : "",
+      email: row.email || "",
+      nid: "", 
+      dob: row.date_of_birth ? row.date_of_birth.toISOString().split('T')[0] : "",
+      division: row.division || "",
+      district: row.district || "",
+      accountType: row.account_type || "",
+      tin: row.tin_number || "",
+      tradingPermissions: [
+        ...(row.permission_cash ? ["Cash"] : []),
+        ...(row.permission_margin ? ["Margin"] : []),
+        ...(row.permission_foreign ? ["Foreign"] : [])
+      ],
+      kycStatus: row.app_status === "approved" ? "verified" : "pending",
+      boAccountNo: "", 
+      verifiedAt: row.submitted_at ? row.submitted_at.toISOString() : "",
+      avatar: null,
+    };
+  }
 }

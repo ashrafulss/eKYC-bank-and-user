@@ -2,6 +2,7 @@
 
 import { authService } from "@/app/services/auth.service";
 import { cookieUtil, STEP_VALUES } from "@/app/utils/cookies";
+import { useAuth } from "@/app/context/auth-context";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useEffect, useCallback } from "react";
 
@@ -10,6 +11,7 @@ const OTP_TIMER = 60;
 
 export default function MobileVerification() {
   const router = useRouter();
+  const { refetchUser } = useAuth();
 
   const [mobile, setMobile] = useState("");
   const [showModal, setShowModal] = useState(false);
@@ -152,6 +154,9 @@ export default function MobileVerification() {
       }
 
       cookieUtil.setRegStep(STEP_VALUES.MOBILE_VERIFIED);
+
+      // Trigger a fresh /auth/me fetch so AuthContext user is populated
+      await refetchUser();
 
       router.push("/register/nid-verification");
     } catch (err: any) {

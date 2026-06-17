@@ -1,9 +1,11 @@
-// lib/auth-context.tsx
+
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { cookieUtil } from "../utils/cookies";
+import apiClient from "../../lib/api-client";
 
-// ── USER TYPE — extend as more steps complete ─────────────────
+
 export interface User {
   id: string;
   mobile: string;
@@ -22,63 +24,55 @@ export interface User {
   avatar: string | null;
 }
 
-// ── STATIC MOCK USER — replace fetch() with this for now ──────
-const MOCK_USER: User = {
-  id: "usr_001",
-  mobile: "+880 1712-",
-  name: "Sajeeb Ahmed",
-  email: "sajeeb@example.com",
-  nid: "1992 8374 5621",
-  dob: "1990-06-15",
-  division: "Dhaka",
-  district: "Dhaka",
-  accountType: "Individual",
-  tin: "TIN-2024-88291",
-  tradingPermissions: ["Cash", "Margin"],
-  kycStatus: "verified",
-  boAccountNo: "BO-1204-8821-0034",
-  verifiedAt: "2024-06-10T09:30:00Z",
-  avatar: null,
-};
-
-// ── CONTEXT TYPE ──────────────────────────────────────────────
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  setUser: (user: User | null) => void; // lets any step update the user
+  setUser: (user: User | null) => void;
+  refetchUser: () => Promise<void>; 
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   setUser: () => {},
+  refetchUser: async () => {},
 });
 
-// ── PROVIDER ─────────────────────────────────────────────────
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // ── STATIC MODE: comment this block out and uncomment the
-    //    fetch() below when your backend is ready ─────────────
-    setUser(MOCK_USER);
-    setLoading(false);
+  const fetchUser = useCallback(async () => {
+    const token = cookieUtil.getCookie("next_auth_session");
+    if (!token) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
 
-    // ── DYNAMIC MODE (uncomment when backend is ready): ───────
-    // fetch("/api/auth/me")
-    //   .then((r) => r.json())
-    //   .then((data) => setUser(data.user ?? null))
-    //   .catch(() => setUser(null))
-    //   .finally(() => setLoading(false));
+    setLoading(true);
+    try {
+      const response = await apiClient.get("/auth/me");
+      setUser(response.data?.data?.user || response.data?.user || null);
+    } catch (err) {
+      console.error("Failed to fetch current user profile:", err);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    fetchUser();
+  }, [fetchUser]);
+
   return (
-    <AuthContext.Provider value={{ user, loading, setUser }}>
+    <AuthContext.Provider value={{ user, loading, setUser, refetchUser: fetchUser }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-// ── HOOK ─────────────────────────────────────────────────────
+
 export const useAuth = () => useContext(AuthContext);
+

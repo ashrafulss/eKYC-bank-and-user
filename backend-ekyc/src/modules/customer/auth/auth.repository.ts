@@ -103,4 +103,36 @@ export class AuthRepository {
   async deleteAllUserSessions(userId: string) {
     await pool.query("DELETE FROM user_sessions WHERE user_id = $1", [userId]);
   }
+
+  async findFullUserById(id: string) {
+    const query = `
+      SELECT 
+        u.id,
+        u.mobile,
+        u.email,
+        u.is_verified,
+        p.first_name,
+        p.last_name,
+        p.date_of_birth,
+        addr.division,
+        addr.district,
+        bo.account_type,
+        bo.tin_number,
+        bo.permission_cash,
+        bo.permission_margin,
+        bo.permission_foreign,
+        app.status as app_status,
+        app.submitted_at
+      FROM users u
+      LEFT JOIN applications app ON app.user_id = u.id
+      LEFT JOIN personal_info p ON p.application_id = app.id
+      LEFT JOIN address_info addr ON addr.application_id = app.id
+      LEFT JOIN bo_accounts bo ON bo.application_id = app.id
+      WHERE u.id = $1
+      ORDER BY app.submitted_at DESC
+      LIMIT 1;
+    `;
+    const result = await pool.query(query, [id]);
+    return result.rows[0] || null;
+  }
 }
