@@ -13,7 +13,8 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- User Wizard Progression Pipeline
 CREATE TYPE registration_step AS ENUM (
-  'mobile_verified',
+  'phone_number_not_verified',
+  'phone_number_verified',
   'nid_verified',
   'selfie_verified',
   'basic_info_done',
@@ -122,7 +123,7 @@ CREATE TABLE IF NOT EXISTS users (
   email         VARCHAR(100) UNIQUE,
   is_verified   BOOLEAN DEFAULT FALSE,
   status        account_status DEFAULT 'active',
-  current_step  registration_step DEFAULT 'mobile_verified',
+  current_step  registration_step DEFAULT 'phone_number_not_verified',
   created_at    TIMESTAMPTZ DEFAULT NOW(),
   updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
