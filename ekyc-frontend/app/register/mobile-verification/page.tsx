@@ -14,19 +14,14 @@ export default function MobileVerification() {
   const [showModal, setShowModal] = useState(false);
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [error, setError] = useState("");
-
-  // ── PRODUCTION NETWORK STATES ──
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
-
-  // ── TIMER STATE ──
   const [timeLeft, setTimeLeft] = useState(OTP_TIMER);
   const [canResend, setCanResend] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
-  // ── START / RESTART TIMER ──
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     setTimeLeft(OTP_TIMER);
@@ -44,21 +39,20 @@ export default function MobileVerification() {
     }, 1000);
   }, []);
 
-  // ── CLEANUP TIMER ON UNMOUNT ──
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
 
-  // ── FOCUS FIRST OTP INPUT WHEN MODAL OPENS ──
+
   useEffect(() => {
     if (showModal) {
       setTimeout(() => inputsRef.current[0]?.focus(), 100);
     }
   }, [showModal]);
 
-  // ── FORMAT MM:SS ──
+
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60)
       .toString()
@@ -67,7 +61,7 @@ export default function MobileVerification() {
     return `${m}:${s}`;
   };
 
-  // ── MOBILE VALIDATION ──
+
   const validateBD = (value: string) => /^1[3-9]\d{8}$/.test(value);
 
   // ── SEND OTP (INTEGRATED) ──
@@ -142,46 +136,48 @@ export default function MobileVerification() {
   };
 
   // ── VERIFY OTP (INTEGRATED) ──
-  const handleVerify = async () => {
-    const fullOtp = otp.join("");
-    if (fullOtp.length !== 6) {
-      alert("Enter full 6-digit verification code");
-      return;
+const handleVerify = async () => {
+  const fullOtp = otp.join("");
+  if (fullOtp.length !== 6) {
+    alert("Enter full 6-digit verification code");
+    return;
+  }
+
+  setVerifying(true);
+  try {
+    const response = await apiClient.post("/auth/verify-otp", {
+      mobile: `+880${mobile}`,
+      otpCode: fullOtp,
+    });
+
+    // Extract the JWT token from your Express backend response object tree
+    const token = response.data?.data?.accessToken;
+
+    if (timerRef.current) clearInterval(timerRef.current);
+    setShowModal(false);
+    setOtp(["", "", "", "", "", ""]);
+
+    // 🌟 FIX 1: removed "Secure" flag — it silently blocks the cookie on http://localhost
+    const isProduction = process.env.NODE_ENV === "production";
+    const secureFlag = isProduction ? "; Secure" : "";
+
+    if (token) {
+      document.cookie = `next_auth_session=${token}; path=/; max-age=3600; SameSite=Strict${secureFlag}`;
     }
 
-    setVerifying(true);
-    try {
-      const response = await apiClient.post("/auth/verify-otp", {
-        mobile: `+880${mobile}`,
-        otpCode: fullOtp,
-      });
+    // 🌟 FIX 2: value must be "mobile_verified" to match the middleware's STEP_ORDER
+    document.cookie = `reg_step=mobile_verified; path=/; max-age=1800; SameSite=Strict${secureFlag}`;
 
-      // Extract the JWT token from your Express backend response object tree
-      const token = response.data?.data?.accessToken;
-
-      if (timerRef.current) clearInterval(timerRef.current);
-      setShowModal(false);
-      setOtp(["", "", "", "", "", ""]);
-
-      if (token) {
-        // 1. Save JWT string to cookie matching your middleware and interceptor lookup keys
-        document.cookie = `next_auth_session=${token}; path=/; max-age=3600; SameSite=Strict; Secure`;
-      }
-
-      // 2. Set the workflow path progression milestone token
-      document.cookie =
-        "reg_step=nid_pending; path=/; max-age=1800; SameSite=Strict";
-
-      // 3. Route cleanly onwards to NID verification page
-      router.push("/register/nid-verification");
-    } catch (err: any) {
-      alert(
-        err.message || "Invalid validation code or attempts limit exceeded.",
-      );
-    } finally {
-      setVerifying(false);
-    }
-  };
+    // 3. Route cleanly onwards to NID verification page
+    router.push("/register/nid-verification");
+  } catch (err: any) {
+    alert(
+      err.message || "Invalid validation code or attempts limit exceeded.",
+    );
+  } finally {
+    setVerifying(false);
+  }
+};
 
   // ── CLOSE MODAL ──
   const handleClose = () => {
