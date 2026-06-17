@@ -1,4 +1,4 @@
-// middleware.ts
+
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -6,13 +6,13 @@ const PUBLIC_ROUTES = ["/", "/register/mobile-verification"];
 
 // Step order matches your actual stepper: Mobile → NID → Selfie → Basic Info → Nominee → Review → Submitted
 const STEP_ORDER = [
-  "mobile_verified",   // after OTP success → unlocks NID
-  "nid_verified",      // after NID capture/OCR → unlocks Selfie
-  "selfie_verified",   // after liveness check → unlocks Basic Info
-  "basic_info_done",   // after personal details → unlocks Nominee
-  "nominee_done",      // after nominee/BO setup → unlocks Review
-  "review_done",       // after confirming details → unlocks Submitted
-  "submitted",         // final state
+  "mobile_verified",   
+  "nid_verified",      
+  "selfie_verified",   
+  "basic_info_done",   
+  "nominee_done",      
+  "review_done",       
+  "submitted",         
 ] as const;
 
 // Each protected route requires the PREVIOUS step to be completed

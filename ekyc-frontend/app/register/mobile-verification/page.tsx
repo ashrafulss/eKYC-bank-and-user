@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState, useEffect, useCallback } from "react";
-// Import your centralized HTTP interceptor client
 import apiClient from "@/lib/api-client";
 
 const OTP_TIMER = 60;
@@ -64,7 +63,6 @@ export default function MobileVerification() {
 
   const validateBD = (value: string) => /^1[3-9]\d{8}$/.test(value);
 
-  // ── SEND OTP (INTEGRATED) ──
   const handleSendOTP = async () => {
     if (!validateBD(mobile)) {
       setError("Enter a valid Bangladeshi mobile number");
@@ -75,27 +73,23 @@ export default function MobileVerification() {
     setLoading(true);
 
     try {
-      // 1. Send the data to your backend API route
-      // Full telephone matching standard: +8801XXXXXXXXX
       await apiClient.post("/auth/send-otp", {
         mobile: `+880${mobile}`,
         email: "ssajeebs@gmail.com",
         deliveryMethod: "both",
       });
 
-      // 2. Open view and start context timer on successful response
       setOtp(["", "", "", "", "", ""]);
       setShowModal(true);
       startTimer();
     } catch (err: any) {
-      // Interceptor captures structured validation errors here
       setError(err.message || "Failed to deliver OTP request. Please retry.");
     } finally {
       setLoading(false);
     }
   };
 
-  // ── RESEND OTP (INTEGRATED) ──
+
   const handleResend = async () => {
     if (!canResend) return;
     setLoading(true);
@@ -116,7 +110,7 @@ export default function MobileVerification() {
     }
   };
 
-  // ── OTP INPUT CHANGE ──
+
   const handleOtpChange = (value: string, index: number) => {
     if (!/^\d?$/.test(value)) return;
     const newOtp = [...otp];
@@ -125,7 +119,7 @@ export default function MobileVerification() {
     if (value && index < 5) inputsRef.current[index + 1]?.focus();
   };
 
-  // ── BACKSPACE NAVIGATION ──
+ 
   const handleKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
     index: number,
@@ -135,7 +129,7 @@ export default function MobileVerification() {
     }
   };
 
-  // ── VERIFY OTP (INTEGRATED) ──
+  
 const handleVerify = async () => {
   const fullOtp = otp.join("");
   if (fullOtp.length !== 6) {
@@ -150,14 +144,14 @@ const handleVerify = async () => {
       otpCode: fullOtp,
     });
 
-    // Extract the JWT token from your Express backend response object tree
+    
     const token = response.data?.data?.accessToken;
 
     if (timerRef.current) clearInterval(timerRef.current);
     setShowModal(false);
     setOtp(["", "", "", "", "", ""]);
 
-    // 🌟 FIX 1: removed "Secure" flag — it silently blocks the cookie on http://localhost
+
     const isProduction = process.env.NODE_ENV === "production";
     const secureFlag = isProduction ? "; Secure" : "";
 
@@ -165,10 +159,8 @@ const handleVerify = async () => {
       document.cookie = `next_auth_session=${token}; path=/; max-age=3600; SameSite=Strict${secureFlag}`;
     }
 
-    // 🌟 FIX 2: value must be "mobile_verified" to match the middleware's STEP_ORDER
     document.cookie = `reg_step=mobile_verified; path=/; max-age=1800; SameSite=Strict${secureFlag}`;
 
-    // 3. Route cleanly onwards to NID verification page
     router.push("/register/nid-verification");
   } catch (err: any) {
     alert(
@@ -179,7 +171,7 @@ const handleVerify = async () => {
   }
 };
 
-  // ── CLOSE MODAL ──
+ 
   const handleClose = () => {
     if (timerRef.current) clearInterval(timerRef.current);
     setShowModal(false);
