@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useEffect, useCallback } from "react";
 
 
-const OTP_TIMER = 60;
+const OTP_TIMER = 180;
 
 export default function MobileVerification() {
   const router = useRouter();
@@ -17,6 +17,7 @@ export default function MobileVerification() {
   const [showModal, setShowModal] = useState(false);
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [error, setError] = useState("");
+  const [modalError, setModalError] = useState("");
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [timeLeft, setTimeLeft] = useState(OTP_TIMER);
@@ -60,6 +61,11 @@ export default function MobileVerification() {
     return `${m}:${s}`;
   };
 
+ 
+const formatTimeOnlySecond = (seconds: number) => {
+  return `${seconds}s`; // Returns values like "180s", "45s", etc.
+};
+
   const validateBD = (value: string) => /^1[3-9]\d{8}$/.test(value);
 
   // ── SEND OTP ──
@@ -80,6 +86,7 @@ export default function MobileVerification() {
       });
 
       setOtp(["", "", "", "", "", ""]);
+      setModalError("");
       setShowModal(true);
       startTimer();
     } catch (err: any) {
@@ -92,6 +99,7 @@ export default function MobileVerification() {
    const handleResend = async () => {
     if (!canResend) return;
     setLoading(true);
+    setModalError("");
 
     try {
       await authService.sendOtp({
@@ -103,7 +111,7 @@ export default function MobileVerification() {
       setTimeout(() => inputsRef.current[0]?.focus(), 100);
       startTimer();
     } catch (err: any) {
-      alert(err.message || "Resend request failed.");
+      setModalError(err.message || "Resend request failed.");
     } finally {
       setLoading(false);
     }
@@ -111,6 +119,7 @@ export default function MobileVerification() {
 
   const handleOtpChange = (value: string, index: number) => {
     if (!/^\d?$/.test(value)) return;
+    setModalError("");
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
@@ -130,11 +139,12 @@ export default function MobileVerification() {
   const handleVerify = async () => {
     const fullOtp = otp.join("");
     if (fullOtp.length !== 6) {
-      alert("Enter full 6-digit verification code");
+      setModalError("Enter full 6-digit verification code");
       return;
     }
 
     setVerifying(true);
+    setModalError("");
     try {
       const result = await authService.verifyOtp({
         mobile: `+880${mobile}`,
@@ -155,12 +165,11 @@ export default function MobileVerification() {
 
       cookieUtil.setRegStep(STEP_VALUES.MOBILE_VERIFIED);
 
-      // Trigger a fresh /auth/me fetch so AuthContext user is populated
       await refetchUser();
 
       router.push("/register/nid-verification");
     } catch (err: any) {
-      alert(
+setModalError(
         err.message || "Invalid validation code or attempts limit exceeded.",
       );
     } finally {
@@ -172,6 +181,7 @@ export default function MobileVerification() {
     if (timerRef.current) clearInterval(timerRef.current);
     setShowModal(false);
     setOtp(["", "", "", "", "", ""]);
+    setModalError("");
   };
 
   const maskMobileNumber = (number: string) => {
@@ -255,6 +265,16 @@ export default function MobileVerification() {
               </p>
             </div>
 
+
+            {modalError && (
+              <div className="flex items-start gap-2.5 bg-red-50 border border-red-100 rounded-lg p-3 text-red-700 text-xs font-medium animate-in slide-in-from-top-1 duration-200">
+                <svg className="w-4 h-4 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span className="leading-normal">{modalError}</span>
+              </div>
+            )}
+
             <div className="flex justify-between gap-2">
               {otp.map((digit, index) => (
                 <input
@@ -290,7 +310,7 @@ export default function MobileVerification() {
                   <span>
                     Resend in{" "}
                     <span className="font-semibold text-cyan-700 tabular-nums">
-                      {formatTime(timeLeft)}
+                      {formatTimeOnlySecond(timeLeft)}
                     </span>
                   </span>
                 </div>

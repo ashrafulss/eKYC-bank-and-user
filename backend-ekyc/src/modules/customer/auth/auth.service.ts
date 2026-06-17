@@ -27,7 +27,7 @@ export class AuthService {
   ): Promise<string> {
     await this.authRepository.invalidatePriorOTPs(mobile);
     const rawOtpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + 3 * 60 * 1000);
     const hashedOtpCode = crypto
       .createHash("sha256")
       .update(rawOtpCode)
