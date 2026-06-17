@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { refreshToken, sendOTP, verifyOTP } from "./auth.controller.js";
+import { logout, refreshToken, sendOTP, verifyOTP } from "./auth.controller.js";
 
 const router = Router();
 
@@ -7,5 +7,6 @@ const router = Router();
 router.post("/auth/send-otp", sendOTP);
 router.post("/auth/verify-otp", verifyOTP);
 router.post("/auth/refresh", refreshToken);
+router.post("/auth/logout", logout);
 
 export default router;

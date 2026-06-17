@@ -69,3 +69,14 @@ export const refreshToken = asyncHandler(
     ApiResponse.ok(res, result, "Token refreshed successfully");
   },
 );
+
+export const logout = asyncHandler(async (req: Request, res: Response) => {
+  const { refreshToken } = req.body;
+
+  await authService.logoutCustomer(refreshToken);
+
+  res.clearCookie("reg_step", { httpOnly: true, sameSite: "strict" });
+  res.clearCookie("next_auth_session", { httpOnly: true, sameSite: "strict" });
+
+  ApiResponse.ok(res, undefined, "Logged out successfully");
+});

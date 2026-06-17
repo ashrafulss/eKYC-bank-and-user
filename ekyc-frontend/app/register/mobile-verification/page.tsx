@@ -1,8 +1,10 @@
 "use client";
 
+import { authService } from "@/app/services/auth.service";
+import { cookieUtil, STEP_VALUES } from "@/app/utils/cookies";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useEffect, useCallback } from "react";
-import apiClient from "@/lib/api-client";
+
 
 const OTP_TIMER = 60;
 
@@ -44,25 +46,21 @@ export default function MobileVerification() {
     };
   }, []);
 
-
   useEffect(() => {
     if (showModal) {
       setTimeout(() => inputsRef.current[0]?.focus(), 100);
     }
   }, [showModal]);
 
-
   const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60)
-      .toString()
-      .padStart(2, "0");
+    const m = Math.floor(seconds / 60).toString().padStart(2, "0");
     const s = (seconds % 60).toString().padStart(2, "0");
     return `${m}:${s}`;
   };
 
-
   const validateBD = (value: string) => /^1[3-9]\d{8}$/.test(value);
 
+  // ── SEND OTP ──
   const handleSendOTP = async () => {
     if (!validateBD(mobile)) {
       setError("Enter a valid Bangladeshi mobile number");
@@ -73,7 +71,7 @@ export default function MobileVerification() {
     setLoading(true);
 
     try {
-      await apiClient.post("/auth/send-otp", {
+      await authService.sendOtp({
         mobile: `+880${mobile}`,
         email: "ssajeebs@gmail.com",
         deliveryMethod: "both",
@@ -89,13 +87,12 @@ export default function MobileVerification() {
     }
   };
 
-
-  const handleResend = async () => {
+   const handleResend = async () => {
     if (!canResend) return;
     setLoading(true);
 
     try {
-      await apiClient.post("/auth/send-otp", {
+      await authService.sendOtp({
         mobile: `+880${mobile}`,
         email: "ssajeebs@gmail.com",
         deliveryMethod: "both",
@@ -110,7 +107,6 @@ export default function MobileVerification() {
     }
   };
 
-
   const handleOtpChange = (value: string, index: number) => {
     if (!/^\d?$/.test(value)) return;
     const newOtp = [...otp];
@@ -119,7 +115,6 @@ export default function MobileVerification() {
     if (value && index < 5) inputsRef.current[index + 1]?.focus();
   };
 
- 
   const handleKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
     index: number,
@@ -129,49 +124,45 @@ export default function MobileVerification() {
     }
   };
 
-  
-const handleVerify = async () => {
-  const fullOtp = otp.join("");
-  if (fullOtp.length !== 6) {
-    alert("Enter full 6-digit verification code");
-    return;
-  }
 
-  setVerifying(true);
-  try {
-    const response = await apiClient.post("/auth/verify-otp", {
-      mobile: `+880${mobile}`,
-      otpCode: fullOtp,
-    });
-
-    
-    const token = response.data?.data?.accessToken;
-
-    if (timerRef.current) clearInterval(timerRef.current);
-    setShowModal(false);
-    setOtp(["", "", "", "", "", ""]);
-
-
-    const isProduction = process.env.NODE_ENV === "production";
-    const secureFlag = isProduction ? "; Secure" : "";
-
-    if (token) {
-      document.cookie = `next_auth_session=${token}; path=/; max-age=3600; SameSite=Strict${secureFlag}`;
+  const handleVerify = async () => {
+    const fullOtp = otp.join("");
+    if (fullOtp.length !== 6) {
+      alert("Enter full 6-digit verification code");
+      return;
     }
 
-    document.cookie = `reg_step=mobile_verified; path=/; max-age=1800; SameSite=Strict${secureFlag}`;
+    setVerifying(true);
+    try {
+      const result = await authService.verifyOtp({
+        mobile: `+880${mobile}`,
+        otpCode: fullOtp,
+      });
 
-    router.push("/register/nid-verification");
-  } catch (err: any) {
-    alert(
-      err.message || "Invalid validation code or attempts limit exceeded.",
-    );
-  } finally {
-    setVerifying(false);
-  }
-};
+      if (timerRef.current) clearInterval(timerRef.current);
+      setShowModal(false);
+      setOtp(["", "", "", "", "", ""]);
 
- 
+      if (result.accessToken) {
+        cookieUtil.setSession(result.accessToken);
+      }
+
+      if (result.refreshToken) {
+        cookieUtil.setRefreshToken(result.refreshToken);
+      }
+
+      cookieUtil.setRegStep(STEP_VALUES.MOBILE_VERIFIED);
+
+      router.push("/register/nid-verification");
+    } catch (err: any) {
+      alert(
+        err.message || "Invalid validation code or attempts limit exceeded.",
+      );
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   const handleClose = () => {
     if (timerRef.current) clearInterval(timerRef.current);
     setShowModal(false);
@@ -192,7 +183,6 @@ const handleVerify = async () => {
           </h1>
         </div>
 
-        {/* MAIN CARD */}
         <div className="bg-white rounded-xl shadow-xs border border-gray-100 p-6 md:p-8 space-y-6">
           <div>
             <h2 className="text-xs font-bold tracking-wider text-cyan-700 uppercase border-b border-gray-100 pb-2 mb-5">
@@ -230,7 +220,6 @@ const handleVerify = async () => {
             </div>
           </div>
 
-          {/* Verification Trigger Button */}
           <div className="pt-2 border-t border-gray-100 flex justify-end">
             <button
               type="button"
@@ -244,7 +233,6 @@ const handleVerify = async () => {
         </div>
       </div>
 
-      {/* ── OTP MODAL ── */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-[380px] p-6 md:p-8 rounded-xl shadow-xl border border-gray-100 space-y-6">
@@ -262,7 +250,6 @@ const handleVerify = async () => {
               </p>
             </div>
 
-            {/* OTP BOXES */}
             <div className="flex justify-between gap-2">
               {otp.map((digit, index) => (
                 <input
@@ -282,7 +269,6 @@ const handleVerify = async () => {
               ))}
             </div>
 
-            {/* ── TIMER + RESEND ── */}
             <div className="flex items-center justify-between px-0.5">
               {!canResend ? (
                 <div className="flex items-center gap-1.5 text-xs text-gray-500">
@@ -321,7 +307,6 @@ const handleVerify = async () => {
               </button>
             </div>
 
-            {/* ACTION BUTTONS */}
             <div className="flex gap-3 pt-2 border-t border-gray-100">
               <button
                 type="button"

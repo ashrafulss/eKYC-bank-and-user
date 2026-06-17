@@ -1,4 +1,4 @@
-import crypto from "crypto"; // 🌟 CRITICAL: Add this native Node.js import at the top
+import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { AuthRepository } from "./auth.repository.js";
 import {
@@ -10,7 +10,6 @@ import {
 export class AuthService {
   private authRepository = new AuthRepository();
 
-  // Your existing Nodemailer transporter configuration remains here...
   private transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST,
     port: parseInt(process.env.EMAIL_PORT || "587"),
@@ -21,35 +20,26 @@ export class AuthService {
     },
   });
 
-  // 1. Handles generating, hashing, saving, and delivering the OTP
   async processOTPDelivery(
     mobile: string,
     email: string,
     deliveryMethod: "sms" | "email" | "both",
   ): Promise<string> {
-    // 1. Invalidate old records
     await this.authRepository.invalidatePriorOTPs(mobile);
-
-    // 2. Generate a SINGLE RAW code for the user
     const rawOtpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-
-    // 3. 🌟 SECURITY FIX: Hash the raw code using SHA-256 before it touches Postgres
     const hashedOtpCode = crypto
       .createHash("sha256")
       .update(rawOtpCode)
       .digest("hex");
 
-    // 4. Save the HASHED code to the database instead of the plaintext one
     await this.authRepository.saveOTPRecord(
       mobile,
       email || "no-email@ekyc.local",
-      hashedOtpCode, // 🌟 Passing the secure hash string here
+      hashedOtpCode,
       expiresAt,
     );
     await this.authRepository.createUserPlaceholder(mobile);
-
-    // 5. Execute Email Delivery using the RAW visible code digits
     if (deliveryMethod === "email" || deliveryMethod === "both") {
       try {
         const mailOptions = {
@@ -73,14 +63,13 @@ export class AuthService {
       }
     }
 
-    // 6. Execute SMS Delivery using the RAW visible code digits
     if (deliveryMethod === "sms" || deliveryMethod === "both") {
       console.log(
         `[SMS MOCK Dual Mode] Dispatch to ${mobile} -> Code: ${rawOtpCode}`,
       );
     }
 
-    return rawOtpCode; // Returns plaintext to controller if it prints inside terminal logs
+    return rawOtpCode;
   }
 
   async validateOTPVerification(mobile: string, otpCode: string) {
@@ -114,7 +103,6 @@ export class AuthService {
   }
 
   async refreshUserToken(refreshToken: string) {
-    // 1. Verify JWT signature/expiry
     let decoded;
     try {
       decoded = verifyRefreshToken(refreshToken);
@@ -122,15 +110,11 @@ export class AuthService {
       throw new Error("INVALID_REFRESH_TOKEN");
     }
 
-    // 2. Check it still exists in DB (not revoked, not already rotated)
     const session = await this.authRepository.findValidSession(refreshToken);
     if (!session) {
-      // Possible theft/reuse — revoke everything for this user as a safety measure
       await this.authRepository.deleteAllUserSessions(decoded.id);
       throw new Error("SESSION_REVOKED");
     }
-
-    // 3. Rotate — delete old, issue new
     await this.authRepository.deleteSession(refreshToken);
 
     const newAccessToken = signAccessToken({
@@ -146,4 +130,9 @@ export class AuthService {
 
     return { accessToken: newAccessToken, refreshToken: newRefreshToken };
   }
+
+  async logoutCustomer(refreshToken: string): Promise<void> {
+  if (!refreshToken) return;
+  await this.authRepository.deleteSession(refreshToken);
+}
 }
