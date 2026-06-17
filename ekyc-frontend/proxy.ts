@@ -6,7 +6,7 @@ const PUBLIC_ROUTES = ["/", "/register/mobile-verification"];
 
 // Step order matches your actual stepper: Mobile → NID → Selfie → Basic Info → Nominee → Review → Submitted
 const STEP_ORDER = [
-  "mobile_verified",   
+  "phone_number_verified",   
   "nid_verified",      
   "selfie_verified",   
   "basic_info_done",   
@@ -17,7 +17,7 @@ const STEP_ORDER = [
 
 // Each protected route requires the PREVIOUS step to be completed
 const ROUTE_STEP_REQUIREMENT: Record<string, (typeof STEP_ORDER)[number]> = {
-  "/register/nid-verification":     "mobile_verified",
+  "/register/nid-verification":     "phone_number_verified",
   "/register/selfie":               "nid_verified",
   "/register/basic-informations":   "selfie_verified",
   "/register/nominee-bo":           "basic_info_done",
@@ -37,7 +37,7 @@ function getRouteForStep(step: string | undefined): string {
   return match?.[0] ?? "/register/mobile-verification";
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const sessionToken = request.cookies.get("next_auth_session")?.value;
@@ -75,6 +75,8 @@ export function middleware(request: NextRequest) {
 
   return NextResponse.next();
 }
+
+export default proxy;
 
 export const config = {
   matcher: ["/((?!api|_next/static|_next/image|assets|favicon.ico).*)"],

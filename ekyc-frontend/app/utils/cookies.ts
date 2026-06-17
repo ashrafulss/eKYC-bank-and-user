@@ -2,7 +2,7 @@ const isProduction = process.env.NODE_ENV === "production";
 const SECURE_FLAG = isProduction ? "; Secure" : "";
 
 export const STEP_VALUES = {
-  MOBILE_VERIFIED: "mobile_verified",
+  PHONE_NUMBER_VERIFIED: "phone_number_verified",
   NID_VERIFIED: "nid_verified",
   SELFIE_VERIFIED: "selfie_verified",
   BASIC_INFO_DONE: "basic_info_done",

@@ -161,7 +161,7 @@ const formatTimeOnlySecond = (seconds: number) => {
         cookieUtil.setRefreshToken(result.refreshToken);
       }
 
-      cookieUtil.setRegStep(STEP_VALUES.MOBILE_VERIFIED);
+      cookieUtil.setRegStep(STEP_VALUES.PHONE_NUMBER_VERIFIED);
 
       await refetchUser();
 
