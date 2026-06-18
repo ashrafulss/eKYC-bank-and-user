@@ -113,7 +113,7 @@ html: `
   }
 
 
-async validateOTPVerification(mobile: string, otpCode: string) {
+async validateOTPVerification(mobile: string, otpCode: string, ipAddress?: string, userAgent?: string) {
 
   const record = await this.authRepository.getLatestUnverifiedOTP(mobile);
 
@@ -164,6 +164,8 @@ let stepToAssign = "phone_number_verified";
     existingUser.id,
     stepToAssign,
     refreshToken,
+    ipAddress,
+    userAgent,
   );
 
   return { user, accessToken, refreshToken };

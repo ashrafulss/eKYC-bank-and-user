@@ -66,6 +66,8 @@ async finalizeVerificationStepAndSession(
     userId: string,
     step: string,
     refreshToken: string,
+    ipAddress?: string,
+    userAgent?: string
   ): Promise<{ id: string; mobile: string; is_verified: boolean; current_step: string }> {
     return withTransaction(async (client) => {
       // 1. Mark OTP as used
@@ -98,10 +100,10 @@ async finalizeVerificationStepAndSession(
       const updatedUser = stepResult.rows[0];
 
       // 4. Create the session
-      await client.query(
-        `INSERT INTO user_sessions (user_id, token_hash, expires_at)
-         VALUES ($1, $2, NOW() + INTERVAL '24 hours')`,
-        [updatedUser.id, refreshToken],
+await client.query(
+        `INSERT INTO user_sessions (user_id, token_hash, ip_address, user_agent, expires_at)
+         VALUES ($1, $2, $3, $4, NOW() + INTERVAL '24 hours')`,
+        [updatedUser.id, refreshToken, ipAddress ?? null, userAgent ?? null],
       );
 
       return updatedUser;

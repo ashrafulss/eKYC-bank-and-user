@@ -33,9 +33,12 @@ export const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
     throw new BadRequestError("Mobile number and code are required");
   }
 
+  const ipAddress = (req.headers["x-forwarded-for"] as string) || req.ip;
+  const userAgent = req.headers["user-agent"] || "Unknown Browser";
+
   let result;
   try {
-    result = await authService.validateOTPVerification(mobile, otpCode);
+    result = await authService.validateOTPVerification(mobile, otpCode, ipAddress, userAgent);
   } catch (error) {
     throw mapServiceError(error);
   }
