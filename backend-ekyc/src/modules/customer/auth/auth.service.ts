@@ -112,36 +112,62 @@ html: `
     return rawOtpCode;
   }
 
-  async validateOTPVerification(mobile: string, otpCode: string) {
-    const record = await this.authRepository.getLatestUnverifiedOTP(mobile);
 
-    if (!record) throw new Error("NO_RECORD");
-    if (record.attempts >= 3) throw new Error("ATTEMPTS_EXCEEDED");
-    if (new Date() > new Date(record.expires_at)) throw new Error("EXPIRED");
+async validateOTPVerification(mobile: string, otpCode: string) {
+  // 1. Fetch the active unverified validation record
+  const record = await this.authRepository.getLatestUnverifiedOTP(mobile);
 
-    const hashedInput = crypto
-      .createHash("sha256")
-      .update(otpCode)
-      .digest("hex");
+  if (!record) throw new Error("NO_RECORD");
+  if (record.attempts >= 3) throw new Error("ATTEMPTS_EXCEEDED");
+  if (new Date() > new Date(record.expires_at)) throw new Error("EXPIRED");
 
-    if (record.otp_code !== hashedInput) {
-      await this.authRepository.incrementOTPEffortCounter(record.id);
-      throw new Error("INVALID_CODE");
-    }
+  // 2. Cryptographic validation hash check
+  const hashedInput = crypto
+    .createHash("sha256")
+    .update(otpCode)
+    .digest("hex");
 
-    const user = await this.authRepository.finalizeUserVerification(
-      record.id,
-      mobile,
-    );
-
-    const accessToken = signAccessToken({ id: user.id, type: "customer" });
-    const refreshToken = signRefreshToken({ id: user.id, type: "customer" });
-
-    await this.authRepository.createUserSession(user.id, refreshToken);
-
-    return { user, accessToken, refreshToken };
+  if (record.otp_code !== hashedInput) {
+    await this.authRepository.incrementOTPEffortCounter(record.id);
+    throw new Error("INVALID_CODE");
   }
 
+  // 🌟 FIX: Fetch the user profile by mobile number to get their ID before finalizing
+  const existingUser = await this.authRepository.getUserByMobile(mobile);
+  
+  if (!existingUser) {
+    throw new Error("USER_NOT_FOUND");
+  }
+
+  const targetUserId = existingUser.id; // Now you safely have the user ID!
+
+  // 3. Mark the OTP record as verified
+  await this.authRepository.finalizeUserVerification(record.id, mobile);
+
+  // 4. Advance the workflow step using the retrieved user ID
+  const user = await this.authRepository.updateUserRegistrationStep(
+    targetUserId, 
+    "phone_number_verified"
+  );
+
+  // 5. Generate secure token packages embedded with the database state step
+  const accessToken = signAccessToken({ 
+    id: user.id, 
+    type: "customer", 
+    current_step: user.current_step 
+  });
+  
+  const refreshToken = signRefreshToken({ 
+    id: user.id, 
+    type: "customer", 
+    current_step: user.current_step 
+  });
+
+  // 6. Save customer token validation mapping
+  await this.authRepository.createUserSession(user.id, refreshToken);
+
+  return { user, accessToken, refreshToken };
+}
   async refreshUserToken(refreshToken: string) {
     let decoded;
     try {

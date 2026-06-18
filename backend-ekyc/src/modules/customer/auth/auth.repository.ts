@@ -49,6 +49,7 @@ export class AuthRepository {
     const result = await pool.query(query, [mobile]);
     return result.rows[0] || null;
   }
+  
 
   
   async incrementOTPEffortCounter(id: string) {
@@ -135,4 +136,29 @@ export class AuthRepository {
     const result = await pool.query(query, [id]);
     return result.rows[0] || null;
   }
+
+
+  async updateUserRegistrationStep(userId: string, step: string) {
+    const query = `
+      UPDATE users 
+      SET current_step = $2::public.registration_step, 
+      updated_at = NOW() 
+      WHERE id = $1 
+      RETURNING id, current_step;
+    `;
+    const result = await pool.query(query, [userId, step]);
+    return result.rows[0];
+  }
+
+  async getUserByMobile(mobile: string) {
+  const query = `
+    SELECT id, mobile, email, current_step 
+    FROM users 
+    WHERE mobile = $1 
+    LIMIT 1;
+  `;
+  const result = await pool.query(query, [mobile]);
+  return result.rows[0]; // Returns the row containing 'id' or undefined if not found
+}
+
 }

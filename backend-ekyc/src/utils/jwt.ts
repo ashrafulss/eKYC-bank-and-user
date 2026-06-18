@@ -9,6 +9,7 @@ const REFRESH_EXPIRES_SECONDS = 86400; // 24 hours
 export interface JwtCustomerPayload {
   id: string;
   type: "customer";
+  current_step?: string;
 }
 
 export const signAccessToken = (payload: JwtCustomerPayload): string => {
