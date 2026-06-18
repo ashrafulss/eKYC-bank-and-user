@@ -1,4 +1,5 @@
 import pool from "../../../config/db.js";
+import { withTransaction } from "../../../utils/withTransaction.js";
 
 export class AuthRepository {
 
@@ -59,17 +60,52 @@ export class AuthRepository {
   }
 
   
-  async finalizeUserVerification(otpId: string, mobile: string) {
-    await pool.query(
-      "UPDATE otp_verification SET verified = true WHERE id = $1",
-      [otpId],
-    );
-   
-    const query = `
-      UPDATE users SET is_verified = true, updated_at = NOW() 
-      WHERE mobile = $1 RETURNING id, mobile, is_verified`;
-    const result = await pool.query(query, [mobile]);
-    return result.rows[0];
+async finalizeVerificationStepAndSession(
+    otpId: string,
+    mobile: string,
+    userId: string,
+    step: string,
+    refreshToken: string,
+  ): Promise<{ id: string; mobile: string; is_verified: boolean; current_step: string }> {
+    return withTransaction(async (client) => {
+      // 1. Mark OTP as used
+      await client.query(
+        "UPDATE otp_verification SET verified = true WHERE id = $1",
+        [otpId],
+      );
+
+      // 2. Activate user's is_verified flag
+      const userResult = await client.query(
+        `UPDATE users SET is_verified = true, updated_at = NOW()
+         WHERE mobile = $1 RETURNING id, mobile, is_verified`,
+        [mobile],
+      );
+
+      const verifiedUser = userResult.rows[0];
+      if (!verifiedUser) {
+        throw new Error("USER_NOT_FOUND");
+      }
+
+      // 3. Advance the registration step
+      const stepResult = await client.query(
+        `UPDATE users
+         SET current_step = $2::public.registration_step, updated_at = NOW()
+         WHERE id = $1
+         RETURNING id, mobile, is_verified, current_step`,
+        [userId, step],
+      );
+
+      const updatedUser = stepResult.rows[0];
+
+      // 4. Create the session
+      await client.query(
+        `INSERT INTO user_sessions (user_id, token_hash, expires_at)
+         VALUES ($1, $2, NOW() + INTERVAL '24 hours')`,
+        [updatedUser.id, refreshToken],
+      );
+
+      return updatedUser;
+    });
   }
 
  

@@ -132,39 +132,33 @@ async validateOTPVerification(mobile: string, otpCode: string) {
     throw new Error("INVALID_CODE");
   }
 
-  // 🌟 FIX: Fetch the user profile by mobile number to get their ID before finalizing
+  // 3. Fetch the user profile by mobile number to get their ID
   const existingUser = await this.authRepository.getUserByMobile(mobile);
-  
+
   if (!existingUser) {
     throw new Error("USER_NOT_FOUND");
   }
 
-  const targetUserId = existingUser.id; // Now you safely have the user ID!
+  // 4. Generate tokens BEFORE the transaction — pure/sync, doesn't touch DB,
+  //    so no risk of partial commits from this step
+  const accessToken = signAccessToken({
+    id: existingUser.id,
+    type: "customer",
+  });
+  const refreshToken = signRefreshToken({
+    id: existingUser.id,
+    type: "customer",
+  });
 
-  // 3. Mark the OTP record as verified
-  await this.authRepository.finalizeUserVerification(record.id, mobile);
-
-  // 4. Advance the workflow step using the retrieved user ID
-  const user = await this.authRepository.updateUserRegistrationStep(
-    targetUserId, 
-    "phone_number_verified"
+  // 5. 🌟 Everything that touches the database now happens atomically.
+  //    If ANY part fails, NOTHING is committed — no more "verified but broken" state.
+  const user = await this.authRepository.finalizeVerificationStepAndSession(
+    record.id,
+    mobile,
+    existingUser.id,
+    "phone_number_verified",
+    refreshToken,
   );
-
-  // 5. Generate secure token packages embedded with the database state step
-  const accessToken = signAccessToken({ 
-    id: user.id, 
-    type: "customer", 
-    current_step: user.current_step 
-  });
-  
-  const refreshToken = signRefreshToken({ 
-    id: user.id, 
-    type: "customer", 
-    current_step: user.current_step 
-  });
-
-  // 6. Save customer token validation mapping
-  await this.authRepository.createUserSession(user.id, refreshToken);
 
   return { user, accessToken, refreshToken };
 }
