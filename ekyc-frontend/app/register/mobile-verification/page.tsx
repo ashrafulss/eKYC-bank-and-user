@@ -173,13 +173,6 @@ const formatTimeOnlySecond = (seconds: number) => {
       setShowModal(false);
       setOtp(["", "", "", "", "", ""]);
 
-      if (result.accessToken) {
-        cookieUtil.setSession(result.accessToken);
-      }
-
-      if (result.refreshToken) {
-        cookieUtil.setRefreshToken(result.refreshToken);
-      }
 
       const dbStep = result.user?.current_step;
 
