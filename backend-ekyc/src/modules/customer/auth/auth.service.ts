@@ -114,14 +114,13 @@ html: `
 
 
 async validateOTPVerification(mobile: string, otpCode: string) {
-  // 1. Fetch the active unverified validation record
+
   const record = await this.authRepository.getLatestUnverifiedOTP(mobile);
 
   if (!record) throw new Error("NO_RECORD");
   if (record.attempts >= 3) throw new Error("ATTEMPTS_EXCEEDED");
   if (new Date() > new Date(record.expires_at)) throw new Error("EXPIRED");
 
-  // 2. Cryptographic validation hash check
   const hashedInput = crypto
     .createHash("sha256")
     .update(otpCode)
@@ -132,36 +131,45 @@ async validateOTPVerification(mobile: string, otpCode: string) {
     throw new Error("INVALID_CODE");
   }
 
-  // 3. Fetch the user profile by mobile number to get their ID
   const existingUser = await this.authRepository.getUserByMobile(mobile);
 
   if (!existingUser) {
     throw new Error("USER_NOT_FOUND");
   }
 
-  // 4. Generate tokens BEFORE the transaction — pure/sync, doesn't touch DB,
-  //    so no risk of partial commits from this step
+let stepToAssign = "phone_number_verified";
+  
+  const unverifiedStates = ["mobile_not_verified", "phone_number_not_verified"];
+
+  if (
+    existingUser.current_step && 
+    !unverifiedStates.includes(existingUser.current_step)
+  ) {
+    stepToAssign = existingUser.current_step;
+  }
   const accessToken = signAccessToken({
     id: existingUser.id,
     type: "customer",
+    current_step: stepToAssign,
   });
   const refreshToken = signRefreshToken({
     id: existingUser.id,
     type: "customer",
+    current_step: stepToAssign,
   });
 
-  // 5. 🌟 Everything that touches the database now happens atomically.
-  //    If ANY part fails, NOTHING is committed — no more "verified but broken" state.
   const user = await this.authRepository.finalizeVerificationStepAndSession(
     record.id,
     mobile,
     existingUser.id,
-    "phone_number_verified",
+    stepToAssign,
     refreshToken,
   );
 
   return { user, accessToken, refreshToken };
 }
+
+
   async refreshUserToken(refreshToken: string) {
     let decoded;
     try {
@@ -200,7 +208,6 @@ async validateOTPVerification(mobile: string, otpCode: string) {
     const row = await this.authRepository.findFullUserById(id);
     if (!row) return null;
 
-    // Map database columns to the frontend expected User format
     return {
       id: row.id,
       mobile: row.mobile,
@@ -221,6 +228,7 @@ async validateOTPVerification(mobile: string, otpCode: string) {
       boAccountNo: "", 
       verifiedAt: row.submitted_at ? row.submitted_at.toISOString() : "",
       avatar: null,
+      current_step: row.current_step,
     };
   }
 }

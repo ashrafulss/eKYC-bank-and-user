@@ -40,6 +40,24 @@ export const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
     throw mapServiceError(error);
   }
 
+  const isProduction = process.env.NODE_ENV === "production";
+
+  res.cookie("next_auth_session", result.accessToken, {
+    httpOnly: false,
+    secure: isProduction,
+    sameSite: "strict",
+    maxAge: 30 * 60 * 1000,
+    path: "/",
+  });
+
+  res.cookie("reg_step", result.user.current_step, {
+    httpOnly: false,
+    secure: isProduction,
+    sameSite: "strict",
+    maxAge: 24 * 60 * 60 * 1000,
+    path: "/",
+  });
+
   ApiResponse.ok(
     res,
     {

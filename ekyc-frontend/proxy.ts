@@ -4,9 +4,9 @@ import type { NextRequest } from "next/server";
 
 const PUBLIC_ROUTES = ["/", "/register/mobile-verification"];
 
-// Step order matches your actual stepper: Mobile → NID → Selfie → Basic Info → Nominee → Review → Submitted
+
 const STEP_ORDER = [
-  "phone_number_verified",   
+  "phone_number_verified", 
   "nid_verified",      
   "selfie_verified",   
   "basic_info_done",   
@@ -15,7 +15,7 @@ const STEP_ORDER = [
   "submitted",         
 ] as const;
 
-// Each protected route requires the PREVIOUS step to be completed
+
 const ROUTE_STEP_REQUIREMENT: Record<string, (typeof STEP_ORDER)[number]> = {
   "/register/nid-verification":     "phone_number_verified",
   "/register/selfie":               "nid_verified",
@@ -31,49 +31,88 @@ function getStepIndex(step: string | undefined): number {
 }
 
 function getRouteForStep(step: string | undefined): string {
-  const match = Object.entries(ROUTE_STEP_REQUIREMENT).find(
-    ([, requiredStep]) => requiredStep === step,
-  );
-  return match?.[0] ?? "/register/mobile-verification";
+  if (step === "phone_number_verified") return "/register/nid-verification";
+  if (step === "nid_verified")           return "/register/selfie";
+  if (step === "selfie_verified")        return "/register/basic-informations";
+  if (step === "basic_info_done")        return "/register/nominee-bo";
+  if (step === "nominee_done")           return "/register/review";
+  if (step === "review_done" || step === "submitted") return "/register/submitted";
+  
+  return "/register/mobile-verification";
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const sessionToken = request.cookies.get("next_auth_session")?.value;
-  const regStep = request.cookies.get("reg_step")?.value;
-
+  
   const isPublicRoute =
     PUBLIC_ROUTES.some((route) => pathname === route) ||
     pathname.startsWith("/_next");
 
-  // ── Case A: Not logged in, trying to access a protected route ──
+
   if (!sessionToken && !isPublicRoute) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  // ── Case B: Logged in, trying to access root page ──
-  if (sessionToken && pathname === "/") {
-    return NextResponse.redirect(
-      new URL(getRouteForStep(regStep), request.url),
-    );
+  let regStep: string | undefined = undefined;
+
+
+  if (sessionToken) {
+    try {
+      const backendResponse = await fetch("http://localhost:5000/api/v1/auth/me", {
+        headers: {
+          "Authorization": `Bearer ${sessionToken}`,
+          "Cookie": `next_auth_session=${sessionToken}`
+        },
+        cache: 'no-store'
+      });
+
+      if (backendResponse.ok) {
+        const result = await backendResponse.json();
+        regStep = result.data?.user?.current_step;
+      }
+    } catch (error) {
+      console.error("❌ Proxy verification connection failed:", error);
+    }
   }
 
-  // ── Case C: Logged in, trying to access a registration step route ──
+
+  if (!regStep) {
+    regStep = request.cookies.get("reg_step")?.value;
+  }
+  if (sessionToken && pathname === "/") {
+    const targetRoute = getRouteForStep(regStep);
+    const response = NextResponse.redirect(new URL(targetRoute, request.url));
+    
+
+    if (regStep) {
+      response.cookies.set("reg_step", regStep, { path: "/", sameSite: "strict" });
+    }
+    return response;
+  }
+
+
   const requiredStep = ROUTE_STEP_REQUIREMENT[pathname];
   if (sessionToken && requiredStep) {
     const requiredIndex = getStepIndex(requiredStep);
     const currentIndex = getStepIndex(regStep);
 
-    // Block skipping ahead — must have completed the required prior step
     if (currentIndex < requiredIndex) {
-      return NextResponse.redirect(
-        new URL(getRouteForStep(regStep), request.url),
-      );
+      const fallbackRoute = getRouteForStep(regStep);
+      const response = NextResponse.redirect(new URL(fallbackRoute, request.url));
+      if (regStep) {
+        response.cookies.set("reg_step", regStep, { path: "/", sameSite: "strict" });
+      }
+      return response;
     }
   }
 
-  return NextResponse.next();
+  const finalResponse = NextResponse.next();
+  if (sessionToken && regStep) {
+    finalResponse.cookies.set("reg_step", regStep, { path: "/", sameSite: "strict" });
+  }
+  return finalResponse;
 }
 
 export default proxy;

@@ -22,6 +22,7 @@ export interface User {
   boAccountNo: string;
   verifiedAt: string;
   avatar: string | null;
+  current_step: string
 }
 
 interface AuthContextType {

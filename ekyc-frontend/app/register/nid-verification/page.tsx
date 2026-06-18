@@ -3,32 +3,26 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
-// ── VALIDATION CONFIG ──────────────────────────────────────────
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];
 const MAX_SIZE_MB = 5;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 
 function validateImageFile(file: File): string | null {
-  // 1. Check MIME type
   if (!ALLOWED_TYPES.includes(file.type)) {
     return `Invalid file type. Only ${ALLOWED_EXTENSIONS.join(", ")} are allowed.`;
   }
-
-  // 2. Check extension (double safety against spoofed MIME)
   const ext = "." + file.name.split(".").pop()?.toLowerCase();
   if (!ALLOWED_EXTENSIONS.includes(ext)) {
     return `Invalid extension. Only ${ALLOWED_EXTENSIONS.join(", ")} are allowed.`;
   }
 
-  // 3. Check file size
   if (file.size > MAX_SIZE_BYTES) {
     return `File too large. Maximum size is ${MAX_SIZE_MB}MB.`;
   }
 
-  return null; // valid
+  return null;
 }
-// ──────────────────────────────────────────────────────────────
 
 export default function NIDVerification() {
   const router = useRouter();
@@ -56,7 +50,6 @@ export default function NIDVerification() {
     setBackError(null);
   };
 
-  // ── FILE BROWSE ──
   const handleFrontBrowse = () => {
     setFrontError(null);
     frontInputRef.current?.click();
@@ -66,10 +59,9 @@ export default function NIDVerification() {
     backInputRef.current?.click();
   };
 
-  // ── FILE CHANGE WITH VALIDATION ──
   const handleFrontChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    e.target.value = ""; // reset so same file can be re-selected after error
+    e.target.value = "";
     if (!file) return;
 
     const err = validateImageFile(file);
@@ -97,7 +89,6 @@ export default function NIDVerification() {
     setBackImage(URL.createObjectURL(file));
   };
 
-  // ── CAMERA ──
   const startCamera = async (side: "front" | "back") => {
     setActiveCamera(side);
     try {
@@ -137,17 +128,20 @@ export default function NIDVerification() {
 
   const canProceed = !!frontImage && !!backImage;
 
+
+  const handleSubmit = async () => {
+   console.log('hello')
+   router.push("/register/selfie")
+  };
+
   return (
-    /* 🌟 FIXED: Changed items-center to items-start & expanded constraints to match max-w-6xl */
     <div className="w-full flex flex-col items-start pt-10 px-4 md:px-8 max-w-6xl mx-auto">
-      {/* 🌟 FIXED: Left-aligned heading container block */}
       <div className="w-full mb-8">
         <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
           Let's Upload/Capture NID Image
         </h1>
       </div>
 
-      {/* Hidden file inputs — accept attribute pre-filters OS file picker */}
       <input
         type="file"
         ref={frontInputRef}
@@ -163,7 +157,6 @@ export default function NIDVerification() {
         className="hidden"
       />
 
-      {/* CAMERA MODAL */}
       {activeCamera && (
         <div className="fixed inset-0 bg-black/70 flex flex-col items-center justify-center z-50">
           <video
@@ -189,10 +182,7 @@ export default function NIDVerification() {
         </div>
       )}
 
-      {/* CARDS CONTAINER */}
-
       <div className="flex flex-col md:flex-row gap-8 w-full">
-        {/* FRONT */}
         <NIDCard
           label="Front Side"
           image={frontImage}
@@ -202,7 +192,6 @@ export default function NIDVerification() {
           onCapture={() => startCamera("front")}
         />
 
-        {/* BACK */}
         <NIDCard
           label="Back Side"
           image={backImage}
@@ -212,8 +201,6 @@ export default function NIDVerification() {
           onCapture={() => startCamera("back")}
         />
       </div>
-
-      {/* NAVIGATION PANEL */}
 
       <div className="w-full flex flex-col sm:flex-row justify-between gap-4 border-t border-slate-200/60 mt-10 pt-6 pb-24">
         <button
@@ -226,7 +213,7 @@ export default function NIDVerification() {
         <div className="flex flex-col items-end gap-2 w-full sm:w-auto">
           <button
             disabled={!canProceed}
-            onClick={() => router.push("/register/selfie")}
+            onClick={handleSubmit}
             className={`px-10 py-3 rounded text-white font-semibold transition-all bg-blue-600 ${
               canProceed
                 ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 cursor-pointer active:scale-[0.98]"
@@ -241,7 +228,6 @@ export default function NIDVerification() {
   );
 }
 
-// ── REUSABLE CARD COMPONENT ─────────────────────────────────────
 type NIDCardProps = {
   label: string;
   image: string | null;
@@ -271,7 +257,6 @@ function NIDCard({
     >
       <p className="font-bold mb-4 text-slate-800">{label}</p>
 
-      {/* Preview / placeholder */}
       <div className="h-40 flex items-center justify-center mb-4 relative">
         {image ? (
           <div className="relative h-full">
@@ -305,7 +290,6 @@ function NIDCard({
         )}
       </div>
 
-      {/* Error message */}
       {error && (
         <div className="flex items-start gap-1.5 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3 text-left">
           <svg
@@ -322,7 +306,6 @@ function NIDCard({
         </div>
       )}
 
-      {/* Buttons */}
       <div className="flex gap-3 justify-center">
         <button
           onClick={onBrowse}
@@ -338,7 +321,6 @@ function NIDCard({
         </button>
       </div>
 
-      {/* Format hint per card */}
       {!image && !error && (
         <p className="text-xs text-gray-400 mt-3">
           JPG · JPEG · PNG · WEBP · max 5MB

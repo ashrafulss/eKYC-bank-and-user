@@ -148,7 +148,7 @@ CREATE TABLE IF NOT EXISTS otp_verification (
 CREATE TABLE IF NOT EXISTS user_sessions (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  token_hash    VARCHAR(255) NOT NULL,
+  token_hash    TEXT NOT NULL,
   ip_address    VARCHAR(45),
   user_agent    TEXT,
   expires_at    TIMESTAMPTZ NOT NULL,

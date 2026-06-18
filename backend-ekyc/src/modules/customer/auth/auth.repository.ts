@@ -148,6 +148,7 @@ async finalizeVerificationStepAndSession(
         u.mobile,
         u.email,
         u.is_verified,
+        u.current_step,
         p.first_name,
         p.last_name,
         p.date_of_birth,
@@ -194,7 +195,7 @@ async finalizeVerificationStepAndSession(
     LIMIT 1;
   `;
   const result = await pool.query(query, [mobile]);
-  return result.rows[0]; // Returns the row containing 'id' or undefined if not found
+  return result.rows[0];
 }
 
 }

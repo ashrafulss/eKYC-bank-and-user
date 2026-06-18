@@ -25,6 +25,26 @@ export default function MobileVerification() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
+  const getRouteForStep = (step: string | undefined): string => {
+    switch (step) {
+      case "phone_number_verified":
+        return "/register/nid-verification";
+      case "nid_verified":
+        return "/register/selfie";
+      case "selfie_verified":
+        return "/register/basic-informations";
+      case "basic_info_done":
+        return "/register/nominee-bo";
+      case "nominee_done":
+        return "/register/review";
+      case "review_done":
+      case "submitted":
+        return "/register/submitted";
+      default:
+        return "/register/nid-verification";
+    }
+  };
+
 
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -63,12 +83,12 @@ export default function MobileVerification() {
 
  
 const formatTimeOnlySecond = (seconds: number) => {
-  return `${seconds}s`; // Returns values like "180s", "45s", etc.
+  return `${seconds}s`; 
 };
 
   const validateBD = (value: string) => /^1[3-9]\d{8}$/.test(value);
 
-  // ── SEND OTP ──
+ 
   const handleSendOTP = async () => {
     if (!validateBD(mobile)) {
       setError("Enter a valid Bangladeshi mobile number");
@@ -161,13 +181,19 @@ const formatTimeOnlySecond = (seconds: number) => {
         cookieUtil.setRefreshToken(result.refreshToken);
       }
 
-      cookieUtil.setRegStep(STEP_VALUES.PHONE_NUMBER_VERIFIED);
+      const dbStep = result.user?.current_step;
+
+      if (dbStep) {
+        cookieUtil.setRegStep(dbStep as any); 
+      } else {
+        cookieUtil.setRegStep("phone_number_verified" as any);
+      }
 
       await refetchUser();
-
-      router.push("/register/nid-verification");
+      const targetRoute = getRouteForStep(dbStep);
+      router.push(targetRoute);
     } catch (err: any) {
-setModalError(
+      setModalError(
         err.message || "Invalid validation code or attempts limit exceeded.",
       );
     } finally {

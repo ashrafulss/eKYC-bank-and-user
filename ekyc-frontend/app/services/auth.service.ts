@@ -16,6 +16,7 @@ export interface CustomerData {
   id: string;
   mobile: string;
   is_verified: boolean;
+  current_step: string;
 }
 
 export interface VerifyOtpResponse {
