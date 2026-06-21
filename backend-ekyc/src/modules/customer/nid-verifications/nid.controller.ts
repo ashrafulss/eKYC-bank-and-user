@@ -1,22 +1,44 @@
-// Example: nid.controller.ts (when you build it)
-import type { Request, Response, NextFunction } from "express";
-import { ApiResponse } from "../../../utils/ApiResponse.js";
+import type { Request, Response } from "express";
+import { nidService } from "./nid.service.js";
 import { asyncHandler } from "../../../utils/asyncHandler.js";
-import { requireStep, advanceToStep, setStepCookie } from "../../../utils/stepGuard.js";
 
-export const uploadNidDocument = asyncHandler(async (req: Request, res: Response) => {
-  const userId = req.customer!.id;
+export const uploadNID = asyncHandler(async (req: Request, res: Response) => {
+  const { frontImage, backImage } = req.body;
 
-  // 🌟 STEP 1 — Verify the REAL database step before doing anything
-  await requireStep(userId, "phone_number_verified");
+  if (!frontImage || !backImage) {
+    res.status(400).json({ 
+      success: false, 
+      message: "Both Front and Back NID image assets are required." 
+    });
+    return;
+  }
 
-  // ... process NID upload, OCR, save to user_documents table ...
+  const userId = req.customer?.id; 
+  if (!userId) {
+    res.status(401).json({ 
+      success: false, 
+      message: "Unauthorized profile request session context missing." 
+    });
+    return;
+  }
 
-  // 🌟 STEP 2 — Only after genuine success, advance the REAL step
-  await advanceToStep(userId, "nid_verified");
+  const result = await nidService.processNIDUploads(userId, frontImage, backImage);
 
-  // 🌟 STEP 3 — Update the cookie for middleware UX routing
-  setStepCookie(res, "nid_verified");
+  const isProduction = process.env.NODE_ENV === "production";
+  res.cookie("reg_step", result.currentStep, {
+    httpOnly: false, 
+    secure: isProduction,
+    sameSite: "strict",
+    maxAge: 24 * 60 * 60 * 1000, 
+    path: "/",
+  });
 
-  ApiResponse.ok(res, { currentStep: "nid_verified" }, "NID verified successfully");
+  res.status(200).json({
+    success: true,
+    message: "NID documents processed and verified successfully.",
+    data: {
+      currentStep: result.currentStep,
+      documents: result.documents
+    }
+  });
 });

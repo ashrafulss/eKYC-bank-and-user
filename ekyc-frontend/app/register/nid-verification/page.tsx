@@ -1,7 +1,9 @@
 "use client";
 
+import { nidService } from "@/app/services/nid.service";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+
 
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];
@@ -32,14 +34,17 @@ export default function NIDVerification() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Note: These states will now hold the raw base64 data strings directly
   const [frontImage, setFrontImage] = useState<string | null>(null);
   const [backImage, setBackImage] = useState<string | null>(null);
   const [frontError, setFrontError] = useState<string | null>(null);
   const [backError, setBackError] = useState<string | null>(null);
 
-  const [activeCamera, setActiveCamera] = useState<"front" | "back" | null>(
-    null,
-  );
+  // 🌟 NEW STATES: Track network operations and API submission errors
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [globalError, setGlobalError] = useState<string | null>(null);
+
+  const [activeCamera, setActiveCamera] = useState<"front" | "back" | null>(null);
 
   const removeFrontImage = () => {
     setFrontImage(null);
@@ -59,7 +64,17 @@ export default function NIDVerification() {
     backInputRef.current?.click();
   };
 
-  const handleFrontChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 🌟 HELPER FUNCTION: Converts a native browser file into a Base64 string safely
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const handleFrontChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
@@ -70,11 +85,17 @@ export default function NIDVerification() {
       return;
     }
 
-    setFrontError(null);
-    setFrontImage(URL.createObjectURL(file));
+    try {
+      setFrontError(null);
+      // Convert browsed file directly into base64 string for the backend
+      const base64Str = await convertFileToBase64(file);
+      setFrontImage(base64Str);
+    } catch (err) {
+      setFrontError("Failed to read image file.");
+    }
   };
 
-  const handleBackChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBackChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
@@ -85,8 +106,14 @@ export default function NIDVerification() {
       return;
     }
 
-    setBackError(null);
-    setBackImage(URL.createObjectURL(file));
+    try {
+      setBackError(null);
+      // Convert browsed file directly into base64 string for the backend
+      const base64Str = await convertFileToBase64(file);
+      setBackImage(base64Str);
+    } catch (err) {
+      setBackError("Failed to read image file.");
+    }
   };
 
   const startCamera = async (side: "front" | "back") => {
@@ -112,6 +139,7 @@ export default function NIDVerification() {
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0);
 
+    // canvas.toDataURL generates a perfect "data:image/png;base64,..." string natively
     const imageData = canvas.toDataURL("image/png");
     if (activeCamera === "front") setFrontImage(imageData);
     else if (activeCamera === "back") setBackImage(imageData);
@@ -126,12 +154,34 @@ export default function NIDVerification() {
     setActiveCamera(null);
   };
 
-  const canProceed = !!frontImage && !!backImage;
+  // Ensure button remains disabled while API submission request is actively pending
+  const canProceed = !!frontImage && !!backImage && !isSubmitting;
 
-
+  // 🌟 SUBMISSION LOGIC: Sends both base64 images to your Express application
   const handleSubmit = async () => {
-   console.log('hello')
-   router.push("/register/selfie")
+    if (!frontImage || !backImage) return;
+
+    setIsSubmitting(true);
+    setGlobalError(null);
+
+    try {
+      // 1. Fire post request via your auth service client wrapper
+      await nidService.uploadNidDocuments({
+        frontImage,
+        backImage,
+      });
+
+      // 2. Clear out any errors and proceed forward 
+      // Express drops the fresh 'reg_step=nid_verified' cookie, allowing your proxy file to accept this step!
+      router.push("/register/selfie");
+    } catch (err: any) {
+      console.error("❌ Submission failed:", err);
+      setGlobalError(
+        err.response?.data?.message || err.message || "Something went wrong while saving your documents. Please try again."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -140,6 +190,13 @@ export default function NIDVerification() {
         <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
           Let's Upload/Capture NID Image
         </h1>
+
+        {/* 🌟 GLOBAL ERROR BANNER DISPLAY */}
+        {globalError && (
+          <div className="mt-4 p-4 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm font-medium">
+            ⚠️ {globalError}
+          </div>
+        )}
       </div>
 
       <input
@@ -205,7 +262,8 @@ export default function NIDVerification() {
       <div className="w-full flex flex-col sm:flex-row justify-between gap-4 border-t border-slate-200/60 mt-10 pt-6 pb-24">
         <button
           onClick={() => router.back()}
-          className="bg-gray-500 text-white px-8 py-3 rounded cursor-pointer"
+          disabled={isSubmitting}
+          className="bg-gray-500 text-white px-8 py-3 rounded cursor-pointer transition-colors hover:bg-gray-600 disabled:opacity-50"
         >
           Back
         </button>
@@ -214,19 +272,21 @@ export default function NIDVerification() {
           <button
             disabled={!canProceed}
             onClick={handleSubmit}
-            className={`px-10 py-3 rounded text-white font-semibold transition-all bg-blue-600 ${
+            className={`px-10 py-3 rounded text-white font-semibold transition-all ${
               canProceed
                 ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 cursor-pointer active:scale-[0.98]"
                 : "bg-gray-200 text-gray-400 shadow-none cursor-not-allowed"
             }`}
           >
-            Next
+            {/* 🌟 LOADING TEXT CONTEXT ACCORDING TO SYSTEM STATE */}
+            {isSubmitting ? "Uploading NID..." : "Next"}
           </button>
         </div>
       </div>
     </div>
   );
 }
+
 
 type NIDCardProps = {
   label: string;
