@@ -3,8 +3,8 @@ import jwt, { type SignOptions } from "jsonwebtoken";
 const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || "access_secret";
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "refresh_secret";
 
-const ACCESS_EXPIRES_SECONDS = 120; // 30 minutes
-const REFRESH_EXPIRES_SECONDS = 86400; // 24 hours
+const ACCESS_EXPIRES_SECONDS = 30 * 60; // 30 minutes
+const REFRESH_EXPIRES_SECONDS = 24 * 60 * 60; // 24 hours
 
 export interface JwtCustomerPayload {
   id: string;
