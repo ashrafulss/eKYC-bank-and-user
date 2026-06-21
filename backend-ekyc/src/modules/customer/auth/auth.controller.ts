@@ -26,6 +26,10 @@ export const sendOTP = asyncHandler(async (req: Request, res: Response) => {
   );
 });
 
+
+
+// backend/modules/auth/auth.controller.ts
+
 export const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
   const { mobile, otpCode } = req.body;
 
@@ -45,14 +49,16 @@ export const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
 
   const isProduction = process.env.NODE_ENV === "production";
 
+  // 1. Access Token Cookie (Visible to Frontend API client)
   res.cookie("next_auth_session", result.accessToken, {
     httpOnly: false,
     secure: isProduction,
     sameSite: "strict",
-    maxAge: 30 * 60 * 1000,
+    maxAge: 30 * 60 * 1000, // 30 minutes
     path: "/",
   });
 
+  // 2. Registration Step Cookie
   res.cookie("reg_step", result.user.current_step, {
     httpOnly: false,
     secure: isProduction,
@@ -61,43 +67,80 @@ export const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
     path: "/",
   });
 
+  // 🌟 FIX 1: Save the Refresh Token into a secure, HttpOnly cookie jar!
+  // This ensures it survives page reloads without needing localStorage.
+  res.cookie("next_refresh_token", result.refreshToken, {
+    httpOnly: true, // Secure: Invisible to frontend JavaScript
+    secure: isProduction,
+    sameSite: "strict",
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    path: "/",
+  });
+
   ApiResponse.ok(
     res,
-    {
-      user: result.user,
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
-    },
+    { user: result.user }, // Cleaned payload
     "Mobile number verified successfully",
   );
 });
 
+
 export const refreshToken = asyncHandler(
   async (req: Request, res: Response) => {
-    const { refreshToken } = req.body;
+    // 🌟 Added optional chaining (?.) so it returns undefined instead of crashing
+    const tokenPayload = req.body.refreshToken || req.cookies?.next_refresh_token;
 
-    if (!refreshToken) {
-      throw new BadRequestError("Refresh token is required");
+    if (!tokenPayload) {
+      throw new BadRequestError("Refresh token session context is missing");
     }
 
     let result;
     try {
-      result = await authService.refreshUserToken(refreshToken);
+      result = await authService.refreshUserToken(tokenPayload);
     } catch (error) {
       throw mapServiceError(error);
+    }
+
+    const isProduction = process.env.NODE_ENV === "production";
+    
+    if (result && result.accessToken) {
+      res.cookie("next_auth_session", result.accessToken, {
+        httpOnly: false,
+        secure: isProduction,
+        sameSite: "strict",
+        maxAge: 30 * 60 * 1000, 
+        path: "/",
+      });
+
+      if (result.refreshToken) {
+        res.cookie("next_refresh_token", result.refreshToken, {
+          httpOnly: true,
+          secure: isProduction,
+          sameSite: "strict",
+          maxAge: 24 * 60 * 60 * 1000,
+          path: "/",
+        });
+      }
     }
 
     ApiResponse.ok(res, result, "Token refreshed successfully");
   },
 );
 
+
+
+// 🌟 UPDATED: Complete cookie eviction on sign-out
 export const logout = asyncHandler(async (req: Request, res: Response) => {
-  const { refreshToken } = req.body;
+  const tokenPayload = req.body.refreshToken || req.cookies["next_refresh_token"];
 
-  await authService.logoutCustomer(refreshToken);
+  if (tokenPayload) {
+    await authService.logoutCustomer(tokenPayload);
+  }
 
-  res.clearCookie("reg_step", { httpOnly: true, sameSite: "strict" });
-  res.clearCookie("next_auth_session", { httpOnly: true, sameSite: "strict" });
+  // Clear all non-HttpOnly and HttpOnly cookies linked to the authentication process
+  res.clearCookie("reg_step", { path: "/", sameSite: "strict" });
+  res.clearCookie("next_auth_session", { path: "/", sameSite: "strict" });
+  res.clearCookie("next_refresh_token", { path: "/", sameSite: "strict" });
 
   ApiResponse.ok(res, undefined, "Logged out successfully");
 });

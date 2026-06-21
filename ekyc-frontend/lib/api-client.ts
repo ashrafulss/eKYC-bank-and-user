@@ -7,30 +7,26 @@ const apiClient = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  withCredentials: true,
+  withCredentials: true, // Ensures cookies are automatically sent with every request
 });
 
+// 🌟 UPDATED: Reads the access token strictly from cookies now
 const getToken = (): string | null => {
   if (typeof window === "undefined") return null;
-  // Read from localStorage primarily
-  const localToken = localStorage.getItem("next_auth_session");
-  if (localToken) return localToken;
   
-  // Fallback to cookie
   const value = `; ${document.cookie}`;
   const parts = value.split(`; next_auth_session=`);
   if (parts.length === 2) return parts.pop()?.split(";").shift() || null;
   return null;
 };
 
-
+// Request Interceptor: Injects the Bearer token from cookies into headers
 apiClient.interceptors.request.use(
   (config) => {
     const token = getToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-
     return config;
   },
   (error) => {
@@ -38,7 +34,7 @@ apiClient.interceptors.request.use(
   },
 );
 
-
+// Response Interceptor: Catches 401 errors and performs cookie-based silent refresh
 apiClient.interceptors.response.use(
   (response) => {
     return response;
@@ -52,47 +48,43 @@ apiClient.interceptors.response.use(
     ) {
       originalRequest._retry = true;
 
-      const refreshToken = typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null;
+      try {
+        console.log("🔄 Access token expired. Triggering silent cookie refresh...");
 
-      if (refreshToken) {
-        try {
-          // Attempt to refresh the token directly with axios to bypass this interceptor
-          const res = await axios.post(
-            `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api/v1"}/auth/refresh`,
-            { refreshToken },
-            { headers: { "Content-Type": "application/json" } }
-          );
-
-          const newAccessToken = res.data?.data?.accessToken;
-          const newRefreshToken = res.data?.data?.refreshToken;
-
-          if (newAccessToken) {
-            localStorage.setItem("next_auth_session", newAccessToken);
-            if (newRefreshToken) {
-              localStorage.setItem("refresh_token", newRefreshToken);
-            }
-            
-            // Retry the original request
-            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-            return apiClient(originalRequest);
+        // 🌟 UPDATED: Passed empty body {} because the refresh token lives inside a cookie.
+        // withCredentials: true forces the browser to send your cookies along automatically.
+        const res = await axios.post(
+          `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api/v1"}/auth/refresh`,
+          {},
+          { 
+            headers: { "Content-Type": "application/json" },
+            withCredentials: true 
           }
-        } catch (refreshErr) {
-          console.error("Silent refresh failed:", refreshErr);
+        );
+
+        // Fallback to checking the newly dropped cookie if it's not explicitly in the JSON body
+        const newAccessToken = res.data?.data?.accessToken || getToken();
+
+        if (newAccessToken) {
+          console.log("✅ Token refreshed successfully via cookies. Retrying original request...");
+          
+          // Re-inject the new token and replay the original network request
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+          return apiClient(originalRequest);
         }
+      } catch (refreshErr) {
+        console.error("❌ Cookie-based silent refresh failed:", refreshErr);
       }
 
-      console.warn(
-        "Session token expired or corrupted. Clearing client context...",
-      );
+      // ── CLEANUP & LOGOUT (Runs only if both access & refresh cookies are dead) ──
+      console.warn("Session expired completely. Evicting client context...");
 
       if (typeof window !== "undefined") {
-        localStorage.removeItem("next_auth_session");
-        localStorage.removeItem("refresh_token");
-        localStorage.removeItem("reg_step");
-        localStorage.removeItem("user_role");
-        document.cookie =
-          "next_auth_session=; path=/; max-age=0; SameSite=Strict";
+        // Clear non-HttpOnly tracking cookies on the frontend
+        document.cookie = "next_auth_session=; path=/; max-age=0; SameSite=Strict";
         document.cookie = "reg_step=; path=/; max-age=0; SameSite=Strict";
+        
+        // Redirect to entry page
         window.location.href = "/";
       }
     }

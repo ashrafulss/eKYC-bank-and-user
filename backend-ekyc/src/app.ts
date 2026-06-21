@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import path from "path";
+import cookieParser from "cookie-parser";
 import { fileURLToPath } from "url"; 
 
 const app = express();
@@ -19,6 +20,7 @@ app.use(
   }),
 );
 app.use(morgan("dev"));
+app.use(cookieParser());
 
 app.use(express.json({ limit: "15mb" }));
 app.use(express.urlencoded({ limit: "15mb", extended: true }));
