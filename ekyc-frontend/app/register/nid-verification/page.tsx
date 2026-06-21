@@ -2,7 +2,8 @@
 
 import { nidService } from "@/app/services/nid.service";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import React, { useRef, useState } from "react";
+import { useAuth } from "@/app/context/auth-context";
 
 
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
@@ -34,9 +35,17 @@ export default function NIDVerification() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  const { user, refetchUser } = useAuth();
+  
   // Note: These states will now hold the raw base64 data strings directly
   const [frontImage, setFrontImage] = useState<string | null>(null);
   const [backImage, setBackImage] = useState<string | null>(null);
+  
+  React.useEffect(() => {
+    if (user?.nidFront && !frontImage) setFrontImage(user.nidFront);
+    if (user?.nidBack && !backImage) setBackImage(user.nidBack);
+  }, [user]);
+
   const [frontError, setFrontError] = useState<string | null>(null);
   const [backError, setBackError] = useState<string | null>(null);
 
@@ -171,7 +180,8 @@ export default function NIDVerification() {
         backImage,
       });
 
-      // 2. Clear out any errors and proceed forward 
+      // 2. Clear out any errors and proceed forward
+      await refetchUser(); 
       // Express drops the fresh 'reg_step=nid_verified' cookie, allowing your proxy file to accept this step!
       router.push("/register/selfie");
     } catch (err: any) {
@@ -305,6 +315,10 @@ function NIDCard({
   onBrowse,
   onCapture,
 }: NIDCardProps) {
+  const displayImage = image?.startsWith("/uploads") 
+    ? `${process.env.NEXT_PUBLIC_API_BASE_URL ? process.env.NEXT_PUBLIC_API_BASE_URL.replace('/api/v1', '') : 'http://localhost:5000'}${image}`
+    : image;
+
   return (
     <div
       className={`flex-1 bg-white border-2 border-dashed p-8 text-center rounded-xl transition-colors ${
@@ -321,7 +335,7 @@ function NIDCard({
         {image ? (
           <div className="relative h-full">
             <img
-              src={image}
+              src={displayImage || ""}
               className="h-full object-contain rounded"
               alt={label}
             />

@@ -216,6 +216,8 @@ let stepToAssign = "phone_number_verified";
       name: row.first_name && row.last_name ? `${row.first_name} ${row.last_name}` : "",
       email: row.email || "",
       nid: "", 
+      nidFront: row.nid_front || null,
+      nidBack: row.nid_back || null,
       dob: row.date_of_birth ? row.date_of_birth.toISOString().split('T')[0] : "",
       division: row.division || "",
       district: row.district || "",

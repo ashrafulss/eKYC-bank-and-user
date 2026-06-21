@@ -162,7 +162,9 @@ await client.query(
         bo.permission_margin,
         bo.permission_foreign,
         app.status as app_status,
-        app.submitted_at
+        app.submitted_at,
+        (SELECT file_url FROM user_documents ud WHERE ud.application_id = app.id AND doc_type = 'nid_front' AND is_latest = true LIMIT 1) as nid_front,
+        (SELECT file_url FROM user_documents ud WHERE ud.application_id = app.id AND doc_type = 'nid_back' AND is_latest = true LIMIT 1) as nid_back
       FROM users u
       LEFT JOIN applications app ON app.user_id = u.id
       LEFT JOIN personal_info p ON p.application_id = app.id

@@ -12,7 +12,7 @@ interface HeaderProps {
 
 export default function Header({ completionPct }: HeaderProps) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -20,12 +20,18 @@ export default function Header({ completionPct }: HeaderProps) {
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
-      const refreshToken = cookieUtil.getCookie("refresh_token");
+      const refreshToken = cookieUtil.getCookie("refresh_token") || typeof window !== "undefined" ? localStorage.getItem("refresh_token") : "";
       await authService.logout(refreshToken || "");
     } catch (err) {
       console.error("Logout failed:", err);
     } finally {
       cookieUtil.clearAll();
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("next_auth_session");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("reg_step");
+        localStorage.removeItem("user_role");
+      }
       router.push("/");
       setLoggingOut(false);
     }
@@ -100,10 +106,12 @@ export default function Header({ completionPct }: HeaderProps) {
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setDropdownOpen((o) => !o)}
-            className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all"
+            className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all cursor-pointer"
           > 
         
-            {user?.avatar ? (
+            {loading ? (
+              <div className="w-7 h-7 rounded-full bg-slate-200 animate-pulse" />
+            ) : user?.avatar ? (
               <img
                 src={user.avatar}
                 className="w-7 h-7 rounded-full object-cover"
@@ -117,7 +125,11 @@ export default function Header({ completionPct }: HeaderProps) {
 
           
             <span className="text-xs font-medium text-gray-700 hidden sm:block">
-              {user?.name || user?.mobile || "—"}
+              {loading ? (
+                <div className="h-4 w-20 bg-slate-200 rounded animate-pulse" />
+              ) : (
+                user?.name || user?.mobile || "—"
+              )}
             </span>
 
           

@@ -22,7 +22,9 @@ export interface User {
   boAccountNo: string;
   verifiedAt: string;
   avatar: string | null;
-  current_step: string
+  current_step: string;
+  nidFront: string | null;
+  nidBack: string | null;
 }
 
 interface AuthContextType {
@@ -44,13 +46,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchUser = useCallback(async () => {
-    const token = cookieUtil.getCookie("next_auth_session");
-    if (!token) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     try {
       const response = await apiClient.get("/auth/me");
@@ -64,7 +59,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    fetchUser();
+    let token = typeof window !== "undefined" ? localStorage.getItem("next_auth_session") : null;
+    
+    if (!token && typeof document !== "undefined") {
+      token = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("next_auth_session="))?.split("=")[1] || null;
+    }
+
+    if (token) {
+      fetchUser();
+    } else {
+      setLoading(false);
+    }
   }, [fetchUser]);
 
   return (
