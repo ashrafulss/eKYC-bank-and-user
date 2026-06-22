@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as faceapi from "face-api.js";
 import { useRouter } from "next/navigation";
+import { selfieApiService } from "@/app/services/selfie.service";
+
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type PoseDir = "left" | "right" | "up" | "down";
 
@@ -17,19 +21,19 @@ type Phase =
 export type AnalysisResult = {
   livenessScore: number;
   isLive: boolean;
-  isDeepfake: boolean;
-  deepfakeReason: string;
   faceMatchScore: number | null;
   faceMatchPass: boolean | null;
   overallPass: boolean;
   summary: string;
 };
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const CHALLENGES: { key: PoseDir; label: string; arrow: string }[] = [
-  { key: "left", label: "Turn left", arrow: "←" },
+  { key: "left",  label: "Turn left",  arrow: "←" },
   { key: "right", label: "Turn right", arrow: "→" },
-  { key: "up", label: "Look up", arrow: "↑" },
-  { key: "down", label: "Look down", arrow: "↓" },
+  { key: "up",    label: "Look up",    arrow: "↑" },
+  { key: "down",  label: "Look down",  arrow: "↓" },
 ];
 
 const HOLD_FRAMES = 8;
@@ -39,14 +43,10 @@ const HOLD_FRAMES = 8;
 // face-api landmark coords come from the RAW (unflipped) frame.
 // Raw frame: pts[36] = user's RIGHT eye (left side of raw image)
 //            pts[45] = user's LEFT  eye (right side of raw image)
-// So raw yaw > 0 means nose shifted RIGHT in raw frame
-//   = user's head turned LEFT in mirror view.
+// Raw yaw > 0 means nose shifted RIGHT in raw frame = user turned LEFT in mirror.
 // We FLIP the sign so displayed left/right matches what the user sees.
 
-function detectPose(
-  lm: faceapi.FaceLandmarks68,
-  videoWidth: number,
-): {
+function detectPose(lm: faceapi.FaceLandmarks68): {
   yaw: number;
   pitch: number;
   downRatio: number;
@@ -55,41 +55,28 @@ function detectPose(
 } {
   const pts = lm.positions;
 
-  // Eye span from raw coords
-  const eyeLeft = pts[36]; // raw left  = user's right eye
-  const eyeRight = pts[45]; // raw right = user's left  eye
-  const eyeWidth = eyeRight.x - eyeLeft.x; // always positive
+  const eyeLeft  = pts[36];
+  const eyeRight = pts[45];
+  const eyeWidth = eyeRight.x - eyeLeft.x;
 
-  // Eye horizontal midpoint
   const eyeMidX =
     ((pts[36].x + pts[39].x) / 2 + (pts[42].x + pts[45].x) / 2) / 2;
 
-  // Raw yaw: nose shifted right in raw frame = user turned LEFT in mirror
   const rawYaw = eyeWidth > 0 ? ((pts[30].x - eyeMidX) / eyeWidth) * 100 : 0;
-
-  // FLIP sign so positive yaw = user turned RIGHT (matches mirror view)
   const yaw = -rawYaw;
 
-  // Pitch: nose tip vs face vertical midpoint
-  // pts[27] = nose bridge top, pts[8] = chin
-  const noseTop = pts[27].y;
-  const chin = pts[8].y;
-  const faceH = chin - noseTop;
+  const noseTop  = pts[27].y;
+  const chin     = pts[8].y;
+  const faceH    = chin - noseTop;
   const faceMidY = (noseTop + chin) / 2;
 
-  // ── Pitch via segment ratio (works regardless of camera angle) ──────────
-  // When looking DOWN: chin rises toward nose  → noseToChin shrinks
-  // When looking UP:   nose rises toward brow  → noseToTop  shrinks
-  // We compare the two halves as a ratio — immune to camera tilt / placement.
-  // Your debug showed pitch: -11.6 while clearly looking down, which means
-  // raw Y-pitch is unreliable on your setup. Ratio method fixes this.
-  const noseY = pts[30].y;
-  const noseToChin = chin - noseY; // shrinks when looking down
-  const noseToTop = noseY - noseTop; // shrinks when looking up
-  const pitch = faceH > 0 ? ((noseY - faceMidY) / faceH) * 100 : 0; // for debug display only
+  const noseY      = pts[30].y;
+  const noseToChin = chin - noseY;
+  const noseToTop  = noseY - noseTop;
+  const pitch      = faceH > 0 ? ((noseY - faceMidY) / faceH) * 100 : 0;
 
-  const downRatio = noseToChin / (noseToTop + 0.001); // < 0.75 = looking down
-  const upRatio = noseToTop / (noseToChin + 0.001); // < 0.75 = looking up
+  const downRatio = noseToChin / (noseToTop  + 0.001);
+  const upRatio   = noseToTop  / (noseToChin + 0.001);
 
   return {
     yaw,
@@ -97,133 +84,111 @@ function detectPose(
     downRatio,
     upRatio,
     passes: {
-      left: yaw < -14,
+      left:  yaw < -14,
       right: yaw > 14,
-      up: upRatio < 0.75,
-      down: downRatio < 1.3,
+      up:    upRatio   < 0.75,
+      down:  downRatio < 1.3,
     },
   };
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Canvas drawing helpers ───────────────────────────────────────────────────
 
-function canvasToBase64(canvas: HTMLCanvasElement): string {
-  return canvas.toDataURL("image/jpeg", 0.92).split(",")[1];
+function drawGuideCircle(ctx: CanvasRenderingContext2D, W: number, H: number) {
+  // Static dashed guide — always visible so user knows where to position face
+  const midX   = W / 2;
+  const midY   = H / 2;
+  const guideR = Math.min(W, H) * 0.38;
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.30)";
+  ctx.lineWidth   = 1.5;
+  ctx.setLineDash([8, 8]);
+  ctx.beginPath();
+  ctx.arc(midX, midY, guideR, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
 }
 
-function descriptorDistance(a: Float32Array, b: Float32Array): number {
-  let sum = 0;
-  for (let i = 0; i < a.length; i++) sum += (a[i] - b[i]) ** 2;
-  return Math.sqrt(sum);
+function drawFaceCircle(
+  ctx: CanvasRenderingContext2D,
+  box: faceapi.Box,
+  passed: boolean,
+) {
+  const cx = box.x + box.width  / 2;
+  const cy = box.y + box.height / 2;
+  const r  = Math.max(box.width, box.height) * 0.62;
+
+  const color = passed
+    ? "rgba(74, 222, 128, 0.95)"   // green-400 when challenge just passed
+    : "rgba(0, 200, 120, 0.90)";   // default green
+
+  ctx.save();
+
+  // Outer soft ring
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+  ctx.lineWidth   = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r + 16, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Main face circle
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = 3;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Subtle fill tint
+  ctx.fillStyle = "rgba(0, 200, 120, 0.07)";
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
 }
 
-function distanceToScore(d: number): number {
-  return Math.round(Math.max(0, Math.min(100, (1 - d / 0.6) * 100)));
+function drawLandmarks(
+  ctx: CanvasRenderingContext2D,
+  positions: faceapi.Point[],
+) {
+  ctx.fillStyle = "rgba(0, 220, 120, 0.75)";
+  for (const pt of positions) {
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
-async function claudeAnalyze(selfieB64: string): Promise<{
-  livenessScore: number;
-  isLive: boolean;
-  isDeepfake: boolean;
-  deepfakeReason: string;
-}> {
-  const apiKey = process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY;
-  if (!apiKey)
-    return {
-      livenessScore: 75,
-      isLive: true,
-      isDeepfake: false,
-      deepfakeReason: "",
-    };
-
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 256,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "image",
-              source: {
-                type: "base64",
-                media_type: "image/jpeg",
-                data: selfieB64,
-              },
-            },
-            {
-              type: "text",
-              text: `You are a biometric liveness and deepfake detection AI.
-Analyze this selfie. Return ONLY valid JSON, no markdown, no explanation.
-{
-  "livenessScore": <integer 0-100>,
-  "isLive": <boolean, true if livenessScore >= 65>,
-  "isDeepfake": <boolean>,
-  "deepfakeReason": "<empty string if not deepfake>"
-}`,
-            },
-          ],
-        },
-      ],
-    }),
-  });
-
-  if (!res.ok) throw new Error(`Claude API ${res.status}`);
-  const data = await res.json();
-  const text = data.content
-    .map((b: { type: string; text?: string }) => b.text ?? "")
-    .join("")
-    .replace(/```json|```/g, "")
-    .trim();
-  return JSON.parse(text);
-}
-
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
-  idCardFile?: File | null;
   onComplete?: (result: AnalysisResult) => void;
   onContinue?: () => void;
 }
 
-export default function LivenessSelfie({
-  idCardFile,
-  onComplete,
-  onContinue,
-}: Props) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const overlayRef = useRef<HTMLCanvasElement>(null);
-  const rafRef = useRef<number>(0);
-  const holdRef = useRef<Partial<Record<PoseDir, number>>>({});
+// ─── Component ────────────────────────────────────────────────────────────────
 
-  const [phase, setPhase] = useState<Phase>("loading");
+export default function LivenessSelfie({ onComplete, onContinue }: Props) {
+  const videoRef   = useRef<HTMLVideoElement>(null);
+  const canvasRef  = useRef<HTMLCanvasElement>(null);
+  const overlayRef = useRef<HTMLCanvasElement>(null);
+  const rafRef     = useRef<number>(0);
+  const holdRef    = useRef<Partial<Record<PoseDir, number>>>({});
+
+  const [phase,        setPhase]        = useState<Phase>("loading");
   const [challengeIdx, setChallengeIdx] = useState(0);
-  const [passed, setPassed] = useState<Set<PoseDir>>(new Set());
-  const [selfieUrl, setSelfieUrl] = useState<string | null>(null);
-  const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [errorMsg, setErrorMsg] = useState("");
+  const [passed,       setPassed]       = useState<Set<PoseDir>>(new Set());
+  const [selfieUrl,    setSelfieUrl]    = useState<string | null>(null);
+  const [result,       setResult]       = useState<AnalysisResult | null>(null);
+  const [errorMsg,     setErrorMsg]     = useState("");
   const [loadProgress, setLoadProgress] = useState(0);
 
   const router = useRouter();
 
-  // Debug state — remove in production
-  const [debugPose, setDebugPose] = useState({
-    yaw: 0,
-    pitch: 0,
-    downRatio: 0,
-    upRatio: 0,
-  });
-
   // ── Load models ──────────────────────────────────────────────────────────────
+  // faceRecognitionNet removed — face match is done server-side
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -231,11 +196,8 @@ export default function LivenessSelfie({
       setLoadProgress(10);
       await faceapi.nets.tinyFaceDetector.loadFromUri(M);
       if (cancelled) return;
-      setLoadProgress(35);
+      setLoadProgress(50);
       await faceapi.nets.faceLandmark68Net.loadFromUri(M);
-      if (cancelled) return;
-      setLoadProgress(65);
-      await faceapi.nets.faceRecognitionNet.loadFromUri(M);
       if (cancelled) return;
       setLoadProgress(90);
       await faceapi.nets.faceExpressionNet.loadFromUri(M);
@@ -246,9 +208,7 @@ export default function LivenessSelfie({
       setErrorMsg(`Model load failed: ${e.message}`);
       setPhase("error");
     });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   // ── Stop camera ──────────────────────────────────────────────────────────────
@@ -280,53 +240,42 @@ export default function LivenessSelfie({
     await video.play();
 
     const overlay = overlayRef.current!;
-    const opts = new faceapi.TinyFaceDetectorOptions({
+    const opts    = new faceapi.TinyFaceDetectorOptions({
       inputSize: 320,
       scoreThreshold: 0.5,
     });
 
-    let localPassed = new Set<PoseDir>();
+    let localPassed       = new Set<PoseDir>();
     let localChallengeIdx = 0;
 
     async function detect() {
       if (!videoRef.current || videoRef.current.paused) return;
 
-      const W = videoRef.current.videoWidth || 640;
+      const W = videoRef.current.videoWidth  || 640;
       const H = videoRef.current.videoHeight || 480;
-      overlay.width = W;
+      overlay.width  = W;
       overlay.height = H;
 
       const ctx = overlay.getContext("2d")!;
       ctx.clearRect(0, 0, W, H);
 
+      // Always draw guide circle first (visible even before face detected)
+      drawGuideCircle(ctx, W, H);
+
       const det = await faceapi
         .detectSingleFace(videoRef.current, opts)
-        .withFaceLandmarks()
-        .withFaceDescriptor();
+        .withFaceLandmarks();
 
       if (det) {
-        const { landmarks, detection: d, descriptor } = det;
+        const { landmarks, detection: d } = det;
 
-        // ── Draw overlay on MIRRORED canvas ───────────────────────────────
-        // Canvas itself is CSS-flipped (scaleX -1) to match the video.
-        // So we draw at RAW coords — the CSS flip puts them in the right place.
-        ctx.strokeStyle = "rgba(0, 220, 120, 0.85)";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(d.box.x, d.box.y, d.box.width, d.box.height);
+        // Draw face circle (replaces old bounding box)
+        drawFaceCircle(ctx, d.box, localPassed.size > 0);
 
-        ctx.fillStyle = "rgba(0, 220, 120, 0.9)";
-        for (const pt of landmarks.positions) {
-          ctx.beginPath();
-          ctx.arc(pt.x, pt.y, 2, 0, Math.PI * 2);
-          ctx.fill();
-        }
+        // Draw landmarks (small dots — subtle inside the circle)
+        drawLandmarks(ctx, landmarks.positions);
 
-        // ── Pose logic ────────────────────────────────────────────────────
-        const { yaw, pitch, downRatio, upRatio, passes } = detectPose(
-          landmarks,
-          W,
-        );
-        setDebugPose({ yaw, pitch, downRatio, upRatio });
+        const { passes } = detectPose(landmarks);
 
         const challenge = CHALLENGES[localChallengeIdx];
         if (challenge && passes[challenge.key]) {
@@ -344,15 +293,15 @@ export default function LivenessSelfie({
             const nextIdx = localChallengeIdx + 1;
 
             if (nextIdx >= CHALLENGES.length) {
-              // All done — capture
+              // All challenges passed — capture selfie
               stopCamera();
               const cap = canvasRef.current!;
-              cap.width = W;
+              cap.width  = W;
               cap.height = H;
               cap.getContext("2d")!.drawImage(videoRef.current!, 0, 0);
               setSelfieUrl(cap.toDataURL("image/jpeg", 0.92));
               setPhase("analyzing");
-              runAnalysis(canvasToBase64(cap), descriptor, idCardFile ?? null);
+              runAnalysis(cap);
               return;
             }
 
@@ -368,53 +317,31 @@ export default function LivenessSelfie({
     }
 
     rafRef.current = requestAnimationFrame(detect);
-  }, [idCardFile, stopCamera]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [stopCamera]);
 
-  // ── Analysis ─────────────────────────────────────────────────────────────────
-  async function runAnalysis(
-    selfieB64: string,
-    descriptor: Float32Array,
-    idFile: File | null,
-  ) {
+  // ── Analysis — send selfie to backend ────────────────────────────────────────
+  async function runAnalysis(selfieCanvas: HTMLCanvasElement) {
     try {
-      const claudeResult = await claudeAnalyze(selfieB64);
+      const selfieImage = selfieCanvas.toDataURL("image/jpeg", 0.92);
 
-      let faceMatchScore: number | null = null;
-      let faceMatchPass: boolean | null = null;
+      const data = await selfieApiService.verifySelfie(selfieImage);
 
-      if (idFile) {
-        const img = await faceapi.fetchImage(URL.createObjectURL(idFile));
-        const idDet = await faceapi
-          .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
-          .withFaceLandmarks()
-          .withFaceDescriptor();
-        if (idDet) {
-          const dist = descriptorDistance(descriptor, idDet.descriptor);
-          faceMatchScore = distanceToScore(dist);
-          faceMatchPass = faceMatchScore >= 60;
-        }
-      }
-
-      const overallPass =
-        claudeResult.isLive &&
-        !claudeResult.isDeepfake &&
-        (faceMatchPass === null || faceMatchPass === true);
-
-      const res: AnalysisResult = {
-        ...claudeResult,
-        faceMatchScore,
-        faceMatchPass,
-        overallPass,
-        summary: overallPass
+      const result: AnalysisResult = {
+        livenessScore:  data.livenessScore,
+        isLive:         data.livenessPass,
+        faceMatchScore: data.faceMatchScore,
+        faceMatchPass:  data.faceMatchPass,
+        overallPass:    data.overallPass,
+        summary: data.overallPass
           ? "Identity verified successfully."
           : "Verification failed — please retake.",
       };
 
-      setResult(res);
+      setResult(result);
       setPhase("result");
-      onComplete?.(res);
-    } catch (e: unknown) {
-      setErrorMsg(e instanceof Error ? e.message : String(e));
+      onComplete?.(result);
+    } catch (e: any) {
+      setErrorMsg(e.message || "Verification failed. Please try again.");
       setPhase("error");
     }
   }
@@ -436,7 +363,8 @@ export default function LivenessSelfie({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        {/* Loading */}
+
+        {/* ── Loading ── */}
         {phase === "loading" && (
           <div className="p-8 flex flex-col items-center gap-4">
             <div className="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
@@ -451,14 +379,14 @@ export default function LivenessSelfie({
           </div>
         )}
 
-        {/* Instructions */}
+        {/* ── Instructions ── */}
         {phase === "instructions" && (
           <div className="p-6">
             <h1 className="text-2xl font-bold text-center text-gray-900">
               Face Verification
             </h1>
             <p className="text-center text-gray-500 mt-1 text-sm">
-              Liveness · deepfake detection{idCardFile ? " · ID match" : ""}
+              Liveness check · ID face match
             </p>
             <div className="mt-5 space-y-2.5">
               {[
@@ -479,9 +407,7 @@ export default function LivenessSelfie({
                   key={key}
                   className="flex-1 bg-gray-50 rounded-xl py-2 flex flex-col items-center text-xs text-gray-500 gap-1"
                 >
-                  <span className="text-base font-bold text-gray-700">
-                    {arrow}
-                  </span>
+                  <span className="text-base font-bold text-gray-700">{arrow}</span>
                   {label}
                 </div>
               ))}
@@ -492,17 +418,10 @@ export default function LivenessSelfie({
             >
               Start Verification
             </button>
-
-            <button
-              onClick={() => router.push("/register/basic-informations")}
-              className="w-full mt-5 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold transition-all"
-            >
-              Next
-            </button>
           </div>
         )}
 
-        {/* Challenge */}
+        {/* ── Challenge ── */}
         {phase === "challenge" && (
           <div>
             <div className="relative bg-black">
@@ -532,11 +451,10 @@ export default function LivenessSelfie({
               </div>
             </div>
 
-            {/* Challenge tiles */}
             <div className="p-4">
               <div className="flex gap-2">
                 {CHALLENGES.map(({ key, arrow, label }) => {
-                  const done = passed.has(key);
+                  const done   = passed.has(key);
                   const active = !done && key === currentChallenge.key;
                   return (
                     <div
@@ -555,56 +473,6 @@ export default function LivenessSelfie({
                   );
                 })}
               </div>
-
-              {/* ── DEBUG BAR — remove this whole block in production ── */}
-              {/* <div className="mt-3 p-2 bg-gray-900 rounded-lg font-mono text-xs flex flex-wrap gap-x-3 gap-y-1">
-                <span className="text-yellow-400">
-                  yaw:{debugPose.yaw.toFixed(1)}
-                </span>
-                <span className="text-cyan-400">
-                  pitch:{debugPose.pitch.toFixed(1)}
-                </span>
-                <span className="text-purple-400">
-                  ↓ratio:{debugPose.downRatio.toFixed(2)}
-                </span>
-                <span className="text-pink-400">
-                  ↑ratio:{debugPose.upRatio.toFixed(2)}
-                </span>
-                <span
-                  className={
-                    debugPose.yaw < -14 ? "text-green-400" : "text-gray-600"
-                  }
-                >
-                  ← left
-                </span>
-                <span
-                  className={
-                    debugPose.yaw > 14 ? "text-green-400" : "text-gray-600"
-                  }
-                >
-                  right →
-                </span>
-                <span
-                  className={
-                    debugPose.upRatio < 0.75
-                      ? "text-green-400"
-                      : "text-gray-600"
-                  }
-                >
-                  ↑ up
-                </span>
-                <span
-                  className={
-                    debugPose.downRatio < 0.75
-                      ? "text-green-400"
-                      : "text-gray-600"
-                  }
-                >
-                  ↓ down
-                </span>
-              </div> */}
-              {/* ── END DEBUG BAR ── */}
-
               <p className="text-center text-xs text-gray-400 mt-2">
                 {passed.size} / {CHALLENGES.length} done
               </p>
@@ -612,7 +480,7 @@ export default function LivenessSelfie({
           </div>
         )}
 
-        {/* Analyzing */}
+        {/* ── Analyzing ── */}
         {phase === "analyzing" && (
           <div className="p-8 flex flex-col items-center gap-4">
             {selfieUrl && (
@@ -623,14 +491,14 @@ export default function LivenessSelfie({
               />
             )}
             <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
-            <p className="font-medium text-gray-700">Analyzing…</p>
+            <p className="font-medium text-gray-700">Verifying identity…</p>
             <p className="text-xs text-gray-400 text-center">
-              Liveness · deepfake{idCardFile ? " · face match" : ""}
+              Liveness · face match with NID photo
             </p>
           </div>
         )}
 
-        {/* Result */}
+        {/* ── Result ── */}
         {phase === "result" && result && (
           <div className="p-6">
             <div className="flex flex-col items-center gap-2 mb-5">
@@ -647,44 +515,30 @@ export default function LivenessSelfie({
                 </div>
               )}
               <h2
-                className={`text-lg font-bold ${result.overallPass ? "text-green-700" : "text-red-600"}`}
+                className={`text-lg font-bold ${
+                  result.overallPass ? "text-green-700" : "text-red-600"
+                }`}
               >
-                {result.overallPass
-                  ? "Verification Passed"
-                  : "Verification Failed"}
+                {result.overallPass ? "Verification Passed" : "Verification Failed"}
               </h2>
-              <p className="text-sm text-gray-500 text-center">
-                {result.summary}
-              </p>
+              <p className="text-sm text-gray-500 text-center">{result.summary}</p>
             </div>
+
             <div className="grid grid-cols-2 gap-3 mb-4">
               <ScoreCard
                 label="Liveness score"
                 score={result.livenessScore}
                 pass={result.isLive}
               />
-              <ScoreCard
-                label="Deepfake check"
-                score={result.isDeepfake ? 0 : 100}
-                pass={!result.isDeepfake}
-                passLabel="Authentic"
-                failLabel="Suspected"
-                bar={false}
-              />
               {result.faceMatchScore !== null && (
                 <ScoreCard
-                  label="Face match (ID card)"
+                  label="Face match (NID)"
                   score={result.faceMatchScore}
                   pass={result.faceMatchPass ?? false}
-                  className="col-span-2"
                 />
               )}
             </div>
-            {result.isDeepfake && result.deepfakeReason && (
-              <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-700 mb-4">
-                <strong>Deepfake signal:</strong> {result.deepfakeReason}
-              </div>
-            )}
+
             <div className="flex gap-3">
               <button
                 onClick={reset}
@@ -704,16 +558,12 @@ export default function LivenessSelfie({
           </div>
         )}
 
-        {/* Error */}
+        {/* ── Error ── */}
         {phase === "error" && (
           <div className="p-6 flex flex-col items-center gap-4">
             <span className="text-4xl">⚠️</span>
-            <h2 className="text-lg font-bold text-red-600">
-              Something went wrong
-            </h2>
-            <p className="text-sm text-gray-500 text-center break-all">
-              {errorMsg}
-            </p>
+            <h2 className="text-lg font-bold text-red-600">Something went wrong</h2>
+            <p className="text-sm text-gray-500 text-center break-all">{errorMsg}</p>
             <button
               onClick={reset}
               className="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold"
@@ -737,7 +587,6 @@ function ScoreCard({
   pass,
   passLabel = "Pass",
   failLabel = "Fail",
-  bar = true,
   className = "",
 }: {
   label: string;
@@ -745,30 +594,32 @@ function ScoreCard({
   pass: boolean;
   passLabel?: string;
   failLabel?: string;
-  bar?: boolean;
   className?: string;
 }) {
   const barColor =
     score >= 80 ? "bg-green-400" : score >= 60 ? "bg-yellow-400" : "bg-red-400";
+
   return (
     <div className={`bg-gray-50 rounded-xl p-3 ${className}`}>
       <p className="text-xs text-gray-500 mb-1">{label}</p>
       <div className="flex items-center justify-between">
         <span className="text-2xl font-bold text-gray-800">{score}</span>
         <span
-          className={`text-xs font-semibold px-2 py-1 rounded-full ${pass ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
+          className={`text-xs font-semibold px-2 py-1 rounded-full ${
+            pass
+              ? "bg-green-100 text-green-700"
+              : "bg-red-100 text-red-700"
+          }`}
         >
           {pass ? passLabel : failLabel}
         </span>
       </div>
-      {bar && (
-        <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full ${barColor}`}
-            style={{ width: `${score}%` }}
-          />
-        </div>
-      )}
+      <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full ${barColor}`}
+          style={{ width: `${score}%` }}
+        />
+      </div>
     </div>
   );
 }
