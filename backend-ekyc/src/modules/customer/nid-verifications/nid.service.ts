@@ -40,33 +40,77 @@ async function saveBase64Image(base64String: string, userId: string, side: "fron
 
 export const nidService = {
   async processNIDUploads(userId: string, frontBase64: string, backBase64: string) {
-
+    // Save images directly onto disk storage locations safely
     const frontFileInfo = await saveBase64Image(frontBase64, userId, "front");
     const backFileInfo = await saveBase64Image(backBase64, userId, "back");
 
-    return await withTransaction(async (client) => {
-      
-      const frontDoc = await nidRepository.saveNIDDocument({
-        userId,
-        docType: "nid_front", 
-        fileUrl: frontFileInfo.fileUrl,
-        fileName: frontFileInfo.fileName,
-        fileSize: frontFileInfo.fileSize,
-        mimeType: frontFileInfo.mimeType,
-      }, client); 
 
-      const backDoc = await nidRepository.saveNIDDocument({
-        userId,
-        docType: "nid_back",
-        fileUrl: backFileInfo.fileUrl,
-        fileName: backFileInfo.fileName,
-        fileSize: backFileInfo.fileSize,
-        mimeType: backFileInfo.mimeType,
-      }, client); 
+    const staticNIDData = {
+      nidNumber: "5509823412",
+      firstName: "Rahat",
+      lastName: "Chowdhury",
+      dateOfBirth: "1994-10-15", // YYYY-MM-DD
+      gender: "male" as const,
+      nationality: "Bangladeshi",
+      addressLine1: "House 42, Road 11, Banani",
+      district: "Dhaka",
+      division: "Dhaka",
+      postalCode: "1213"
+    };
+
+    const frontOcrMock = {
+      nid_number: staticNIDData.nidNumber,
+      full_name: `${staticNIDData.firstName} ${staticNIDData.lastName}`,
+      dob: staticNIDData.dateOfBirth,
+      gender: staticNIDData.gender,
+      raw_ocr_confidence: 98.4
+    };
+
+    const backOcrMock = {
+      permanent_address: staticNIDData.addressLine1,
+      district: staticNIDData.district,
+      division: staticNIDData.division,
+      postal_code: staticNIDData.postalCode,
+      blood_group: "O+"
+    };
+
+    return await withTransaction(async (client) => {
+      const documents = await nidRepository.saveNIDDocumentAndDemographics(
+        {
+          userId,
+          docType: "nid_front",
+          fileUrl: frontFileInfo.fileUrl,
+          fileName: frontFileInfo.fileName,
+          fileSize: frontFileInfo.fileSize,
+          mimeType: frontFileInfo.mimeType,
+          ocrData: frontOcrMock
+        },
+        {
+          userId,
+          docType: "nid_back",
+          fileUrl: backFileInfo.fileUrl,
+          fileName: backFileInfo.fileName,
+          fileSize: backFileInfo.fileSize,
+          mimeType: backFileInfo.mimeType,
+          ocrData: backOcrMock
+        },
+        {
+          firstName: staticNIDData.firstName,
+          lastName: staticNIDData.lastName,
+          dateOfBirth: staticNIDData.dateOfBirth,
+          gender: staticNIDData.gender,
+          nationality: staticNIDData.nationality,
+          addressLine1: staticNIDData.addressLine1,
+          district: staticNIDData.district,
+          division: staticNIDData.division,
+          postalCode: staticNIDData.postalCode
+        },
+        client
+      );
 
       return {
-        currentStep: "nid_verified",
-        documents: [frontDoc, backDoc],
+        currentStep: "nid_verified" as const,
+        documents: documents,
       };
     });
   },
