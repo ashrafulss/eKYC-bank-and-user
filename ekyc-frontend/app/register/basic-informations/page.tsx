@@ -26,13 +26,32 @@ export default function BasicInformations() {
     monthlyIncome: "Below BDT 50,000",
   });
 
+  const [loading, setLoading] = useState<boolean>(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   useEffect(() => {
     const loadBasicInformation = async () => {
       try {
+        setLoading(true);
+        setErrorMessage(null);
+        
         const data = await basicInformationService.getBasicInformations();
+        
+        // 🌟 Reformat raw ISO Date strings to make them compatible with native HTML inputs (YYYY-MM-DD)
+        if (data.dob) {
+          const dateObj = new Date(data.dob);
+          if (!isNaN(dateObj.getTime())) {
+            data.dob = dateObj.toISOString().split("T")[0];
+          }
+        }
+
         setFormData((prev) => ({ ...prev, ...data }));
-      } catch (error) {
-        console.error("Failed to load basic information:", error);
+      } catch (error: any) {
+        // Automatically picks up the interceptor's formatted message layout
+        console.error("Failed to load pre-populated basic information profile:", error);
+        setErrorMessage(error.message || "Could not retrieve identity details.");
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -46,13 +65,11 @@ export default function BasicInformations() {
     }));
   };
 
-  // Helper logic to validate the email string structure correctly
   const isValidEmail = (emailStr: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(emailStr.trim());
   };
 
-  // Main evaluation: checks all necessary keys AND evaluates proper email form
   const isFormValid = () => {
     return (
       formData.fullNameEnglish.trim() !== "" &&
@@ -66,14 +83,36 @@ export default function BasicInformations() {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-sm text-gray-500 font-medium">Fetching verified identity records...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full min-h-screen bg-slate-50 overflow-y-auto py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
+        
+        {/* Error Alert Bar */}
+        {errorMessage && (
+          <div className="w-full p-4 mb-6 bg-red-50 border-l-4 border-red-500 rounded-r-md text-sm text-red-700">
+            <strong>Initialization Error:</strong> {errorMessage}
+          </div>
+        )}
+
         {/* Header Block */}
         <div className="w-full mb-2">
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
             Let's provide some primary information
           </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Verified fields are automatically filled from your uploaded NID identity cards.
+          </p>
         </div>
 
         {/* Form Container */}
@@ -331,7 +370,7 @@ export default function BasicInformations() {
         <div className="w-full mt-8 flex flex-col sm:flex-row justify-between items-center border-t border-gray-200 pt-6 gap-4">
           <button
             onClick={() => router.back()}
-            className="bg-gray-500 text-white px-8 py-3 rounded cursor-pointer hover:bg-gray-600 transition-colors"
+            className="w-full sm:w-auto bg-gray-500 text-white px-8 py-3 rounded cursor-pointer hover:bg-gray-600 transition-colors"
           >
             Back
           </button>
@@ -340,7 +379,7 @@ export default function BasicInformations() {
             <button
               disabled={!isFormValid()}
               onClick={() => router.push("/register/nominee-bo")}
-              className={`px-10 py-3 rounded text-white font-semibold transition-all ${
+              className={`w-full sm:w-auto px-10 py-3 rounded text-white font-semibold transition-all ${
                 isFormValid()
                   ? "bg-blue-600 hover:bg-blue-700 cursor-pointer"
                   : "bg-blue-400 opacity-50 cursor-not-allowed"

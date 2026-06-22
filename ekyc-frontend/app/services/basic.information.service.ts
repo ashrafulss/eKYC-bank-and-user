@@ -1,4 +1,5 @@
-import axios from "axios";
+import apiClient from "@/lib/api-client";
+
 export interface BasicInformationsData {
   fullNameEnglish: string;
   fullNameBangla: string;
@@ -15,29 +16,12 @@ export interface BasicInformationsData {
   monthlyIncome: string;
 }
 
-const mockBasicInformationsData: BasicInformationsData = {
-  fullNameEnglish: "Md Sajeeb Hasan",
-  fullNameBangla: "মোঃ সাজীব হাসান",
-  fatherNameBangla: "মোঃ আবুল হাসান",
-  motherNameBangla: "মোছাঃ রোকেয়া বেগম",
-  dob: "1998-05-15",
-  gender: "Male",
-  nidNumber: "1234567890123",
-  mobile: "01712345678",
-  presentAddress: "Dhaka, Bangladesh",
-  email: "sajeeb@gmail.com",
-  occupation: "Software Engineer",
-  employer: "XYZ Technologies Ltd",
-  monthlyIncome: "BDT 50,000 - 100,000",
-};
-
 export const basicInformationService = {
+
   async getBasicInformations(): Promise<BasicInformationsData> {
-    // Simulate API delay
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(mockBasicInformationsData);
-      }, 1000);
-    });
-  },
+
+    const response = await apiClient.get<{ data: BasicInformationsData }>("/basic-info");
+    
+    return response.data.data;
+  }
 };

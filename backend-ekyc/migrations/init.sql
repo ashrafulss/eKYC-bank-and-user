@@ -209,17 +209,24 @@ CREATE TABLE IF NOT EXISTS applications (
 -- 9. PERSONAL INFO (1 to 1 with application)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS personal_info (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  application_id  UUID UNIQUE NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
-  first_name      VARCHAR(100) NOT NULL,
-  last_name       VARCHAR(100) NOT NULL,
-  date_of_birth   DATE NOT NULL,
-  gender          biological_gender NOT NULL,
-  nationality     VARCHAR(50),
-  mobile          VARCHAR(20),
-  email           VARCHAR(100),
-  created_at      TIMESTAMPTZ DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ DEFAULT NOW()
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  application_id      UUID UNIQUE NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+  nid_number          VARCHAR(50) UNIQUE,
+  first_name          VARCHAR(100) NOT NULL,
+  last_name           VARCHAR(255) NOT NULL, 
+  full_name_bangla    VARCHAR(255),
+  father_name_bangla  VARCHAR(255),
+  mother_name_bangla  VARCHAR(255),
+  date_of_birth       DATE NOT NULL,
+  gender              biological_gender NOT NULL,
+  nationality         VARCHAR(50),
+  mobile              VARCHAR(20),
+  email               VARCHAR(100),
+  occupation          VARCHAR(150),          
+  employer_name       VARCHAR(255),        
+  monthly_income      VARCHAR(100),         
+  created_at          TIMESTAMPTZ DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================

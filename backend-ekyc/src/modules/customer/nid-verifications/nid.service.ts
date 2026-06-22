@@ -44,11 +44,14 @@ export const nidService = {
     const frontFileInfo = await saveBase64Image(frontBase64, userId, "front");
     const backFileInfo = await saveBase64Image(backBase64, userId, "back");
 
-
+    // 🌟 UPDATED: Included Bangla structural mock keys derived from ML payload response
     const staticNIDData = {
       nidNumber: "5509823412",
       firstName: "Rahat",
       lastName: "Chowdhury",
+      fullNameBangla: "রাহাত চৌধুরী",          // Added
+      fatherNameBangla: "আহমেদ চৌধুরী",       // Added
+      motherNameBangla: "বেগম চৌধুরী",         // Added
       dateOfBirth: "1994-10-15", // YYYY-MM-DD
       gender: "male" as const,
       nationality: "Bangladeshi",
@@ -61,6 +64,9 @@ export const nidService = {
     const frontOcrMock = {
       nid_number: staticNIDData.nidNumber,
       full_name: `${staticNIDData.firstName} ${staticNIDData.lastName}`,
+      name_bn: staticNIDData.fullNameBangla,              // Kept in JSON as backup
+      father_name_bn: staticNIDData.fatherNameBangla,     // Kept in JSON as backup
+      mother_name_bn: staticNIDData.motherNameBangla,     // Kept in JSON as backup
       dob: staticNIDData.dateOfBirth,
       gender: staticNIDData.gender,
       raw_ocr_confidence: 98.4
@@ -97,6 +103,9 @@ export const nidService = {
         {
           firstName: staticNIDData.firstName,
           lastName: staticNIDData.lastName,
+          fullNameBangla: staticNIDData.fullNameBangla,     // 🌟 Added to payload mapping
+          fatherNameBangla: staticNIDData.fatherNameBangla, // 🌟 Added to payload mapping
+          motherNameBangla: staticNIDData.motherNameBangla, // 🌟 Added to payload mapping
           dateOfBirth: staticNIDData.dateOfBirth,
           gender: staticNIDData.gender,
           nationality: staticNIDData.nationality,

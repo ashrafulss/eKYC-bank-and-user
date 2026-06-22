@@ -4,6 +4,7 @@ import nidRoutes from "../modules/customer/nid-verifications/nid.routes.js";
 import selfieRoutes from "../modules/customer/selfie/selfie.routes.js";
 import nomineeRoutes from "../modules/customer/nominee/nominee.routes.js";
 import boRoutes from "../modules/customer/bo-preferences/bo.routes.js";
+import basicInfoRoutes from "../modules/customer/basic-info/basic-info.routes.js";
 
 const initiateRoutes = (app: Express): void => {
   const apiV1Initials = "/api/v1";
@@ -13,6 +14,7 @@ const initiateRoutes = (app: Express): void => {
   app.use(apiV1Initials, selfieRoutes);
   app.use(apiV1Initials, nomineeRoutes);
   app.use(apiV1Initials, boRoutes);
+  app.use(apiV1Initials, basicInfoRoutes);
 
 
   app.get(`${apiV1Initials}/health-check`, (req: Request, res: Response) => {

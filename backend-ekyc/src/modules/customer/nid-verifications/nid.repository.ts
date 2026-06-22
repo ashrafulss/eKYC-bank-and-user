@@ -13,6 +13,9 @@ export interface SaveDocumentPayload {
 export interface StaticProfilePayload {
   firstName: string;
   lastName: string;
+  fullNameBangla: string;   // 🌟 Added
+  fatherNameBangla: string; // 🌟 Added
+  motherNameBangla: string; // 🌟 Added
   dateOfBirth: string;
   gender: "male" | "female" | "other";
   nationality: string;
@@ -54,14 +57,26 @@ export const nidRepository = {
   ) {
     const applicationId = await this.getOrCreateApplicationId(frontPayload.userId, client);
 
-    // 1. Save or Update Demographics (personal_info Table Mapping)
+    // 1. Save or Update Demographics (Includes direct mapping for Bangla columns now!)
     await client.query(
       `INSERT INTO public.personal_info (
-        application_id, first_name, last_name, date_of_birth, gender, nationality, updated_at
-       ) VALUES ($1, $2, $3, $4, $5::public.biological_gender, $6, NOW())
+        application_id, 
+        first_name, 
+        last_name, 
+        full_name_bangla, 
+        father_name_bangla, 
+        mother_name_bangla, 
+        date_of_birth, 
+        gender, 
+        nationality, 
+        updated_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::public.biological_gender, $9, NOW())
        ON CONFLICT (application_id) DO UPDATE SET
          first_name = EXCLUDED.first_name,
          last_name = EXCLUDED.last_name,
+         full_name_bangla = EXCLUDED.full_name_bangla,
+         father_name_bangla = EXCLUDED.father_name_bangla,
+         mother_name_bangla = EXCLUDED.mother_name_bangla,
          date_of_birth = EXCLUDED.date_of_birth,
          gender = EXCLUDED.gender,
          updated_at = NOW()`,
@@ -69,9 +84,12 @@ export const nidRepository = {
         applicationId,
         staticProfile.firstName,
         staticProfile.lastName,
-        staticProfile.dateOfBirth,
-        staticProfile.gender,
-        staticProfile.nationality
+        staticProfile.fullNameBangla,   // $4
+        staticProfile.fatherNameBangla, // $5
+        staticProfile.motherNameBangla, // $6
+        staticProfile.dateOfBirth,      // $7
+        staticProfile.gender,           // $8
+        staticProfile.nationality       // $9
       ]
     );
 
