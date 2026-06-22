@@ -80,14 +80,20 @@ export const basicInfoRepository = {
 
     // 2. 🌟 FIXED: Upserts the customized address directly to the address_line1 column
     await client.query(
-      `INSERT INTO public.address_info (application_id, address_line1, updated_at)
-       VALUES ($1, $2, NOW())
-       ON CONFLICT (application_id)
-       DO UPDATE SET 
-         address_line1 = EXCLUDED.address_line1, 
-         updated_at = NOW();`,
-      [input.applicationId, input.presentAddress]
-    );
+  `INSERT INTO public.address_info (
+    application_id, 
+    address_line1, 
+    district, 
+    division, 
+    updated_at
+   )
+   VALUES ($1, $2, 'Unknown', 'Unknown', NOW())
+   ON CONFLICT (application_id)
+   DO UPDATE SET 
+     address_line1 = EXCLUDED.address_line1, 
+     updated_at = NOW();`,
+  [input.applicationId, input.presentAddress]
+);;
   },
 
   async updateUserWizardStep(userId: string, step: string, client: PoolClient): Promise<void> {

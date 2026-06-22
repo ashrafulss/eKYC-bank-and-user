@@ -23,5 +23,13 @@ export const basicInformationService = {
     const response = await apiClient.get<{ data: BasicInformationsData }>("/basic-info");
     
     return response.data.data;
-  }
+  },
+
+
+
+  async updateBasicInformations(payload: BasicInformationsData): Promise<void> {
+    await apiClient.put("/basic-info", payload);
+  },
+
+
 };

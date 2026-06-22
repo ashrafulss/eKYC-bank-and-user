@@ -27,6 +27,7 @@ export default function BasicInformations() {
   });
 
   const [loading, setLoading] = useState<boolean>(true);
+  const [submitting, setSubmitting] = useState<boolean>(false); // 🌟 Added submission state tracking
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,7 +38,6 @@ export default function BasicInformations() {
         
         const data = await basicInformationService.getBasicInformations();
         
-        // 🌟 Reformat raw ISO Date strings to make them compatible with native HTML inputs (YYYY-MM-DD)
         if (data.dob) {
           const dateObj = new Date(data.dob);
           if (!isNaN(dateObj.getTime())) {
@@ -47,7 +47,6 @@ export default function BasicInformations() {
 
         setFormData((prev) => ({ ...prev, ...data }));
       } catch (error: any) {
-        // Automatically picks up the interceptor's formatted message layout
         console.error("Failed to load pre-populated basic information profile:", error);
         setErrorMessage(error.message || "Could not retrieve identity details.");
       } finally {
@@ -63,6 +62,27 @@ export default function BasicInformations() {
       ...prev,
       [field]: value,
     }));
+  };
+
+  // 🌟 ADDED: Handle form submission to database before pushing navigation router state
+  const handleNextStep = async () => {
+    if (!isFormValid() || submitting) return;
+    
+    try {
+      setSubmitting(true);
+      setErrorMessage(null);
+      
+      // Save form records to the database backend
+      await basicInformationService.updateBasicInformations(formData);
+      
+      // Advance user step routing forward
+      router.push("/register/nominee-bo");
+    } catch (error: any) {
+      console.error("Failed to persist basic info amendments:", error);
+      setErrorMessage(error.message || "Something went wrong while preserving updates.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const isValidEmail = (emailStr: string) => {
@@ -101,7 +121,7 @@ export default function BasicInformations() {
         {/* Error Alert Bar */}
         {errorMessage && (
           <div className="w-full p-4 mb-6 bg-red-50 border-l-4 border-red-500 rounded-r-md text-sm text-red-700">
-            <strong>Initialization Error:</strong> {errorMessage}
+            <strong>Action Blocked:</strong> {errorMessage}
           </div>
         )}
 
@@ -370,22 +390,30 @@ export default function BasicInformations() {
         <div className="w-full mt-8 flex flex-col sm:flex-row justify-between items-center border-t border-gray-200 pt-6 gap-4">
           <button
             onClick={() => router.back()}
-            className="w-full sm:w-auto bg-gray-500 text-white px-8 py-3 rounded cursor-pointer hover:bg-gray-600 transition-colors"
+            disabled={submitting}
+            className="w-full sm:w-auto bg-gray-500 text-white px-8 py-3 rounded cursor-pointer hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Back
           </button>
 
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto justify-end">
             <button
-              disabled={!isFormValid()}
-              onClick={() => router.push("/register/nominee-bo")}
-              className={`w-full sm:w-auto px-10 py-3 rounded text-white font-semibold transition-all ${
-                isFormValid()
+              disabled={!isFormValid() || submitting}
+              onClick={handleNextStep} // 🌟 BOUND TO SUBMISSION ACTION
+              className={`w-full sm:w-auto px-10 py-3 rounded text-white font-semibold transition-all flex items-center justify-center gap-2 ${
+                isFormValid() && !submitting
                   ? "bg-blue-600 hover:bg-blue-700 cursor-pointer"
                   : "bg-blue-400 opacity-50 cursor-not-allowed"
               }`}
             >
-              Next
+              {submitting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Saving...
+                </>
+              ) : (
+                "Next"
+              )}
             </button>
           </div>
         </div>
