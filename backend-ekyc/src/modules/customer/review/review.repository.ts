@@ -2,14 +2,13 @@
 import type { PoolClient } from "pg";
 
 export const reviewRepository = {
+
   async getFullApplicationSummary(userId: string, client: PoolClient) {
-    // 1. Core structural application details with personal profile and address data
     const query = await client.query(
       `SELECT 
         app.id as application_id,
         app.status as application_status,
         
-        -- Personal Profile Information columns matching your schema
         personal.first_name,
         personal.last_name,
         personal.full_name_bangla,
@@ -24,7 +23,6 @@ export const reviewRepository = {
         personal.employer_name,
         personal.monthly_income,
         
-        -- Address data from your production public.address_info schema
         addr.address_line1,
         addr.address_line2,
         addr.area,
@@ -32,7 +30,6 @@ export const reviewRepository = {
         addr.division,
         addr.postal_code,
 
-        -- Fallback OCR Data payload block from NID front profile scan
         doc.ocr_data
         
        FROM public.applications app
@@ -49,7 +46,6 @@ export const reviewRepository = {
     if (query.rows.length === 0) return null;
     const row = query.rows[0];
 
-    // 2. Query against your actual table name: public.nominees
     const nomineesQuery = await client.query(
       `SELECT name, relationship, nid_passport, date_of_birth, share_percent, contact, nid_skipped
        FROM public.nominees
@@ -58,9 +54,9 @@ export const reviewRepository = {
       [row.application_id]
     );
 
-    // 3. Query against your actual table name: public.bo_accounts
     const boAccountsQuery = await client.query(
-      `SELECT account_type, depository_participant, bank_name, settlement_account, tin_number, permission_cash, permission_margin, permission_foreign
+      `SELECT account_type, depository_participant, bank_name, settlement_account, tin_number,
+              permission_cash, permission_margin, permission_foreign
        FROM public.bo_accounts
        WHERE application_id = $1
        LIMIT 1`,
@@ -72,5 +68,47 @@ export const reviewRepository = {
       nominees: nomineesQuery.rows,
       boAccount: boAccountsQuery.rows[0] || null
     };
+  },
+
+  // Resolve applicationId from userId
+  async getApplicationIdByUserId(userId: string, client: PoolClient): Promise<string | null> {
+    const result = await client.query(
+      `SELECT id FROM public.applications WHERE user_id = $1 LIMIT 1`,
+      [userId]
+    );
+    return result.rows[0]?.id ?? null;
+  },
+
+  // Check current_step on users table — guard against double submission
+  async getUserCurrentStep(userId: string, client: PoolClient): Promise<string | null> {
+    const result = await client.query(
+      `SELECT current_step FROM public.users WHERE id = $1`,
+      [userId]
+    );
+    return result.rows[0]?.current_step ?? null;
+  },
+
+  // 1. Mark application as pending (visible to bank admin maker/checker)
+  // 2. Update submitted_at to actual submission time
+  async markApplicationSubmitted(applicationId: string, client: PoolClient): Promise<void> {
+    await client.query(
+      `UPDATE public.applications
+       SET status = 'pending',
+           submitted_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $1`,
+      [applicationId]
+    );
+  },
+
+  // Advance user wizard step to 'submitted' — final step in registration_step ENUM
+  async advanceUserStepToSubmitted(userId: string, client: PoolClient): Promise<void> {
+    await client.query(
+      `UPDATE public.users
+       SET current_step = 'submitted',
+           updated_at = NOW()
+       WHERE id = $1`,
+      [userId]
+    );
   }
 };

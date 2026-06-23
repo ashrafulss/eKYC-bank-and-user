@@ -3,6 +3,7 @@ import pool from "../../../config/db.js";
 import { reviewRepository } from "./review.repository.js";
 
 export const reviewService = {
+
   async getApplicationSummary(userId: string) {
     const client = await pool.connect();
     try {
@@ -13,7 +14,6 @@ export const reviewService = {
       const ocr = app.ocr_data || {};
       const fallbackEnglishName = `${app.first_name || ""} ${app.last_name || ""}`.trim();
 
-      // Standardize complete mailing layout string dynamically
       const cleanAddressParts = [
         app.address_line1,
         app.address_line2,
@@ -23,8 +23,8 @@ export const reviewService = {
         app.postal_code ? `Postal Code: ${app.postal_code}` : ""
       ].filter(Boolean);
 
-      const presentAddressFormatted = cleanAddressParts.length > 0 
-        ? cleanAddressParts.join(", ") 
+      const presentAddressFormatted = cleanAddressParts.length > 0
+        ? cleanAddressParts.join(", ")
         : ocr.present_address || "—";
 
       return {
@@ -62,6 +62,41 @@ export const reviewService = {
           foreign: bo?.permission_foreign ?? false,
         }
       };
+    } finally {
+      client.release();
+    }
+  },
+
+  async submitApplication(userId: string): Promise<void> {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // Guard: check if user already submitted
+      const currentStep = await reviewRepository.getUserCurrentStep(userId, client);
+      if (!currentStep) {
+        throw new Error("User not found.");
+      }
+      if (currentStep === "submitted") {
+        throw new Error("Application already submitted.");
+      }
+
+      // Resolve applicationId from userId
+      const applicationId = await reviewRepository.getApplicationIdByUserId(userId, client);
+      if (!applicationId) {
+        throw new Error("No active application found for this customer.");
+      }
+
+      // 1. Update applications: status = 'pending', submitted_at = NOW()
+      await reviewRepository.markApplicationSubmitted(applicationId, client);
+
+      // 2. Update users: current_step = 'submitted'
+      await reviewRepository.advanceUserStepToSubmitted(userId, client);
+
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
     } finally {
       client.release();
     }

@@ -26,6 +26,61 @@ interface BoForm {
   foreign: boolean;
 }
 
+// ─── Submission Success Modal ─────────────────────────────────────────────────
+
+function SubmissionModal({ onContinue }: { onContinue: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" />
+
+      {/* Card */}
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center space-y-5">
+
+        {/* Success Icon */}
+        <div className="flex justify-center">
+          <div className="w-20 h-20 rounded-full bg-emerald-50 border-4 border-emerald-100 flex items-center justify-center">
+            <svg className="w-10 h-10 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <h2 className="text-xl font-bold text-slate-900">Application Submitted!</h2>
+          <p className="text-sm text-gray-500 leading-relaxed">
+            Your eKYC registration has been received successfully.
+          </p>
+        </div>
+
+        {/* Status Badge */}
+        <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold px-4 py-2 rounded-full">
+          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+          Awaiting Bank Approval
+        </div>
+
+        {/* Info Box */}
+        <div className="bg-slate-50 border border-gray-100 rounded-xl p-4 text-left space-y-2">
+          <p className="text-xs text-gray-500 leading-relaxed">
+            Our team will review your submitted documents and identity verification records.
+            You will be notified once your BO account is activated.
+          </p>
+          <p className="text-xs text-gray-400">
+            Typical processing time: <span className="font-semibold text-gray-600">1–3 business days</span>
+          </p>
+        </div>
+
+        <button
+          onClick={onContinue}
+          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
+        >
+          Go to My Profile →
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function ReadField({ value }: { value?: string | null }) {
@@ -99,6 +154,9 @@ export default function Review() {
   const [loading, setLoading] = useState(true);
   const [agreed, setAgreed] = useState(false);
   const [userData, setUserData] = useState<any | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // ── Basic Info ──────────────────────────────────────────────────────────────
   const [isEditingBasic, setIsEditingBasic] = useState(false);
@@ -137,10 +195,7 @@ export default function Review() {
     foreign: false,
   });
 
-  // ── Global load error ───────────────────────────────────────────────────────
   const [loadError, setLoadError] = useState<string | null>(null);
-
-  // Derived: any section currently being edited?
   const anyEditing = isEditingBasic || isEditingNominees || isEditingBo;
 
   // ─── Fetch ────────────────────────────────────────────────────────────────
@@ -249,7 +304,22 @@ export default function Review() {
     }
   };
 
-  // ─── Nominee helpers ──────────────────────────────────────────────────────
+  // ─── Submit Handler ───────────────────────────────────────────────────────
+
+  const handleSubmit = async () => {
+    try {
+      setIsSubmitting(true);
+      setSubmitError(null);
+      await reviewApplicationService.submitApplication();
+      setShowModal(true);
+    } catch (err: any) {
+      setSubmitError(err.response?.data?.message || err.message || "Submission failed. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ─── Nominee helper ───────────────────────────────────────────────────────
 
   const updateNominee = (index: number, field: keyof NomineeForm, value: string) => {
     setEditNominees((prev) =>
@@ -289,16 +359,19 @@ export default function Review() {
 
   return (
     <div className="w-full h-full min-h-[calc(100vh-160px)] bg-slate-50 py-12 px-4 md:px-8">
+
+      {/* Submission Modal */}
+      {showModal && (
+        <SubmissionModal onContinue={() => router.push("/profile")} />
+      )}
+
       <div className="max-w-6xl mx-auto space-y-6 pb-24">
 
         <div>
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Review Your Application</h1>
-          
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════════════
-            1. BASIC IDENTITY
-        ═══════════════════════════════════════════════════════════════════ */}
+        {/* ═══ 1. BASIC IDENTITY ═══════════════════════════════════════════ */}
         <div className="bg-white rounded-xl shadow-xs border border-gray-100 p-6 md:p-8 space-y-6">
           <SectionHeader
             label="1. Basic Identity Records"
@@ -308,7 +381,6 @@ export default function Review() {
             onCancel={() => { setIsEditingBasic(false); setBasicError(null); }}
             onSave={handleSaveBasic}
           />
-
           <InlineError message={basicError} />
 
           <div className="space-y-4">
@@ -326,15 +398,11 @@ export default function Review() {
               <span className="text-sm font-medium text-gray-500">Name (Bangla)</span>
               <div className="w-full sm:col-span-2">
                 {isEditingBasic ? (
-                  <input
-                    type="text"
-                    value={editBasic.fullNameBangla}
+                  <input type="text" value={editBasic.fullNameBangla}
                     onChange={(e) => setEditBasic({ ...editBasic, fullNameBangla: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
-                ) : (
-                  <ReadField value={userData?.personal.fullNameBangla} />
-                )}
+                ) : <ReadField value={userData?.personal.fullNameBangla} />}
               </div>
             </div>
 
@@ -345,28 +413,20 @@ export default function Review() {
                 <div>
                   <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Father's Name</span>
                   {isEditingBasic ? (
-                    <input
-                      type="text"
-                      value={editBasic.fatherNameBangla}
+                    <input type="text" value={editBasic.fatherNameBangla}
                       onChange={(e) => setEditBasic({ ...editBasic, fatherNameBangla: e.target.value })}
                       className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     />
-                  ) : (
-                    <ReadField value={userData?.personal.fatherNameBangla} />
-                  )}
+                  ) : <ReadField value={userData?.personal.fatherNameBangla} />}
                 </div>
                 <div>
                   <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Mother's Name</span>
                   {isEditingBasic ? (
-                    <input
-                      type="text"
-                      value={editBasic.motherNameBangla}
+                    <input type="text" value={editBasic.motherNameBangla}
                       onChange={(e) => setEditBasic({ ...editBasic, motherNameBangla: e.target.value })}
                       className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     />
-                  ) : (
-                    <ReadField value={userData?.personal.motherNameBangla} />
-                  )}
+                  ) : <ReadField value={userData?.personal.motherNameBangla} />}
                 </div>
               </div>
             </div>
@@ -376,15 +436,11 @@ export default function Review() {
               <span className="text-sm font-medium text-gray-500">Email Address</span>
               <div className="w-full sm:col-span-2">
                 {isEditingBasic ? (
-                  <input
-                    type="email"
-                    value={editBasic.email}
+                  <input type="email" value={editBasic.email}
                     onChange={(e) => setEditBasic({ ...editBasic, email: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   />
-                ) : (
-                  <ReadField value={userData?.personal.email} />
-                )}
+                ) : <ReadField value={userData?.personal.email} />}
               </div>
             </div>
 
@@ -393,15 +449,11 @@ export default function Review() {
               <span className="text-sm font-medium text-gray-500">Mailing / Present Address</span>
               <div className="w-full sm:col-span-2">
                 {isEditingBasic ? (
-                  <textarea
-                    rows={2}
-                    value={editBasic.presentAddress}
+                  <textarea rows={2} value={editBasic.presentAddress}
                     onChange={(e) => setEditBasic({ ...editBasic, presentAddress: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   />
-                ) : (
-                  <ReadField value={userData?.personal.presentAddress} />
-                )}
+                ) : <ReadField value={userData?.personal.presentAddress} />}
               </div>
             </div>
 
@@ -412,28 +464,20 @@ export default function Review() {
                 <div>
                   <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Occupation</span>
                   {isEditingBasic ? (
-                    <input
-                      type="text"
-                      value={editBasic.occupation}
+                    <input type="text" value={editBasic.occupation}
                       onChange={(e) => setEditBasic({ ...editBasic, occupation: e.target.value })}
                       className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
                     />
-                  ) : (
-                    <ReadField value={userData?.personal.occupation} />
-                  )}
+                  ) : <ReadField value={userData?.personal.occupation} />}
                 </div>
                 <div>
                   <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Employer</span>
                   {isEditingBasic ? (
-                    <input
-                      type="text"
-                      value={editBasic.employer}
+                    <input type="text" value={editBasic.employer}
                       onChange={(e) => setEditBasic({ ...editBasic, employer: e.target.value })}
                       className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
                     />
-                  ) : (
-                    <ReadField value={userData?.personal.employer} />
-                  )}
+                  ) : <ReadField value={userData?.personal.employer} />}
                 </div>
               </div>
             </div>
@@ -443,8 +487,7 @@ export default function Review() {
               <span className="text-sm font-medium text-gray-500">Monthly Income</span>
               <div className="w-full sm:col-span-2">
                 {isEditingBasic ? (
-                  <select
-                    value={editBasic.monthlyIncome}
+                  <select value={editBasic.monthlyIncome}
                     onChange={(e) => setEditBasic({ ...editBasic, monthlyIncome: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
                   >
@@ -452,17 +495,13 @@ export default function Review() {
                     <option value="BDT 50,000 - BDT 1,000,000">BDT 50,000 – BDT 1,000,000</option>
                     <option value="Above BDT 1,000,000">Above BDT 1,000,000</option>
                   </select>
-                ) : (
-                  <ReadField value={userData?.personal.monthlyIncome} />
-                )}
+                ) : <ReadField value={userData?.personal.monthlyIncome} />}
               </div>
             </div>
           </div>
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════════════
-            2. NOMINEES — editable, one card per nominee
-        ═══════════════════════════════════════════════════════════════════ */}
+        {/* ═══ 2. NOMINEES ═════════════════════════════════════════════════ */}
         <div className="bg-white rounded-xl shadow-xs border border-gray-100 p-6 md:p-8 space-y-6">
           <SectionHeader
             label={`2. Nominee Information (${editNominees.length})`}
@@ -472,18 +511,15 @@ export default function Review() {
             onCancel={() => { setIsEditingNominees(false); setNomineeError(null); }}
             onSave={handleSaveNominees}
           />
-
           <InlineError message={nomineeError} />
 
           <div className="space-y-6">
             {editNominees.map((nominee, index) => (
-              <div
-                key={index}
+              <div key={index}
                 className={`rounded-lg border p-4 space-y-4 ${
                   isEditingNominees ? "border-blue-200 bg-blue-50/30" : "border-gray-100 bg-slate-50/40"
                 }`}
               >
-                {/* Nominee sub-header */}
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold tracking-wider text-cyan-700 uppercase">
                     Nominee #{index + 1}
@@ -496,95 +532,64 @@ export default function Review() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Full Name */}
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Full Name</span>
                     {isEditingNominees ? (
-                      <input
-                        type="text"
-                        value={nominee.name}
+                      <input type="text" value={nominee.name}
                         onChange={(e) => updateNominee(index, "name", e.target.value)}
                         className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                       />
-                    ) : (
-                      <p className="text-sm font-semibold text-slate-800">{nominee.name || "—"}</p>
-                    )}
+                    ) : <p className="text-sm font-semibold text-slate-800">{nominee.name || "—"}</p>}
                   </div>
 
-                  {/* Relationship */}
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Relationship</span>
                     {isEditingNominees ? (
-                      <input
-                        type="text"
-                        value={nominee.relationship}
+                      <input type="text" value={nominee.relationship}
                         onChange={(e) => updateNominee(index, "relationship", e.target.value)}
                         className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                       />
-                    ) : (
-                      <p className="text-sm text-slate-700">{nominee.relationship || "—"}</p>
-                    )}
+                    ) : <p className="text-sm text-slate-700">{nominee.relationship || "—"}</p>}
                   </div>
 
-                  {/* NID / Passport */}
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase block mb-1">NID / Passport</span>
                     {isEditingNominees ? (
-                      <input
-                        type="text"
-                        value={nominee.nid}
+                      <input type="text" value={nominee.nid}
                         onChange={(e) => updateNominee(index, "nid", e.target.value)}
                         className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                       />
-                    ) : (
-                      <p className="text-sm font-mono text-slate-700">{nominee.nid || "—"}</p>
-                    )}
+                    ) : <p className="text-sm font-mono text-slate-700">{nominee.nid || "—"}</p>}
                   </div>
 
-                  {/* Date of Birth */}
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Date of Birth</span>
                     {isEditingNominees ? (
-                      <input
-                        type="date"
-                        value={nominee.dob}
+                      <input type="date" value={nominee.dob}
                         onChange={(e) => updateNominee(index, "dob", e.target.value)}
                         className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                       />
-                    ) : (
-                      <p className="text-sm text-slate-700">{nominee.dob || "—"}</p>
-                    )}
+                    ) : <p className="text-sm text-slate-700">{nominee.dob || "—"}</p>}
                   </div>
 
-                  {/* Share % */}
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Share % Allocation</span>
                     {isEditingNominees ? (
-                      <input
-                        type="text"
-                        value={nominee.share}
+                      <input type="text" value={nominee.share} placeholder="e.g. 100% or 50%"
                         onChange={(e) => updateNominee(index, "share", e.target.value)}
-                        placeholder="e.g. 100% or 50%"
                         className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                       />
-                    ) : (
-                      <p className="text-sm font-bold text-cyan-700">{nominee.share || "—"}</p>
-                    )}
+                    ) : <p className="text-sm font-bold text-cyan-700">{nominee.share || "—"}</p>}
                   </div>
 
-                  {/* Contact */}
                   <div>
                     <span className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Contact Number</span>
                     {isEditingNominees ? (
-                      <input
-                        type="tel"
-                        value={nominee.contact}
+                      <input type="tel" value={nominee.contact}
                         onChange={(e) => updateNominee(index, "contact", e.target.value)}
                         className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                       />
-                    ) : (
-                      <p className="text-sm text-slate-700">{nominee.contact || "—"}</p>
-                    )}
+                    ) : <p className="text-sm text-slate-700">{nominee.contact || "—"}</p>}
                   </div>
                 </div>
               </div>
@@ -592,9 +597,7 @@ export default function Review() {
           </div>
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════════════
-            3. BO ACCOUNT & TRADING PREFERENCES
-        ═══════════════════════════════════════════════════════════════════ */}
+        {/* ═══ 3. BO ACCOUNT ═══════════════════════════════════════════════ */}
         <div className="bg-white rounded-xl shadow-xs border border-gray-100 p-6 md:p-8 space-y-6">
           <SectionHeader
             label="3. Trading Account Settlement"
@@ -604,17 +607,14 @@ export default function Review() {
             onCancel={() => { setIsEditingBo(false); setBoError(null); }}
             onSave={handleSaveBo}
           />
-
           <InlineError message={boError} />
 
           <div className="space-y-4">
-            {/* Account Type */}
             <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
               <span className="text-sm font-medium text-gray-500">Account Setup Type</span>
               <div className="w-full sm:col-span-2">
                 {isEditingBo ? (
-                  <select
-                    value={editBo.accountType}
+                  <select value={editBo.accountType}
                     onChange={(e) => setEditBo({ ...editBo, accountType: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
                   >
@@ -622,54 +622,39 @@ export default function Review() {
                     <option value="Joint">Joint</option>
                     <option value="Corporate">Corporate</option>
                   </select>
-                ) : (
-                  <ReadField value={userData?.boPrefs.accountType} />
-                )}
+                ) : <ReadField value={userData?.boPrefs.accountType} />}
               </div>
             </div>
 
-            {/* Depository Participant */}
             <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
               <span className="text-sm font-medium text-gray-500">Depository Participant</span>
               <div className="w-full sm:col-span-2">
                 {isEditingBo ? (
-                  <input
-                    type="text"
-                    value={editBo.dp}
+                  <input type="text" value={editBo.dp}
                     onChange={(e) => setEditBo({ ...editBo, dp: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                   />
-                ) : (
-                  <ReadField value={userData?.boPrefs.dp} />
-                )}
+                ) : <ReadField value={userData?.boPrefs.dp} />}
               </div>
             </div>
 
-            {/* Settlement Bank */}
             <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
               <span className="text-sm font-medium text-gray-500">Settlement Clearing Bank</span>
               <div className="w-full sm:col-span-2">
                 {isEditingBo ? (
-                  <input
-                    type="text"
-                    value={editBo.bank}
+                  <input type="text" value={editBo.bank}
                     onChange={(e) => setEditBo({ ...editBo, bank: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                   />
-                ) : (
-                  <ReadField value={userData?.boPrefs.bank} />
-                )}
+                ) : <ReadField value={userData?.boPrefs.bank} />}
               </div>
             </div>
 
-            {/* Bank Account Number */}
             <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
               <span className="text-sm font-medium text-gray-500">Bank Account Number</span>
               <div className="w-full sm:col-span-2">
                 {isEditingBo ? (
-                  <input
-                    type="text"
-                    value={editBo.settlementAccount}
+                  <input type="text" value={editBo.settlementAccount}
                     onChange={(e) => setEditBo({ ...editBo, settlementAccount: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
                   />
@@ -681,14 +666,11 @@ export default function Review() {
               </div>
             </div>
 
-            {/* TIN */}
             <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
               <span className="text-sm font-medium text-gray-500">TIN Number</span>
               <div className="w-full sm:col-span-2">
                 {isEditingBo ? (
-                  <input
-                    type="text"
-                    value={editBo.tin}
+                  <input type="text" value={editBo.tin}
                     onChange={(e) => setEditBo({ ...editBo, tin: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
                   />
@@ -700,7 +682,6 @@ export default function Review() {
               </div>
             </div>
 
-            {/* Market Segment Rights */}
             <div className="grid grid-cols-1 sm:grid-cols-3 items-start gap-2">
               <span className="text-sm font-medium text-gray-500 pt-1">Market Segments</span>
               <div className="w-full sm:col-span-2">
@@ -708,9 +689,7 @@ export default function Review() {
                   <div className="flex flex-wrap gap-4">
                     {(["cash", "margin", "foreign"] as const).map((key) => (
                       <label key={key} className="flex items-center gap-2 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={editBo[key]}
+                        <input type="checkbox" checked={editBo[key]}
                           onChange={(e) => setEditBo({ ...editBo, [key]: e.target.checked })}
                           className="w-4 h-4 rounded border-gray-300 text-blue-600 accent-blue-600"
                         />
@@ -725,8 +704,7 @@ export default function Review() {
                       { label: "Margin Market", active: userData?.permissions?.margin },
                       { label: "Foreign Market", active: userData?.permissions?.foreign },
                     ].map(({ label, active }) => (
-                      <span
-                        key={label}
+                      <span key={label}
                         className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
                           active
                             ? "bg-emerald-50 border-emerald-200 text-emerald-700"
@@ -743,9 +721,7 @@ export default function Review() {
           </div>
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════════════
-            4. DECLARATION
-        ═══════════════════════════════════════════════════════════════════ */}
+        {/* ═══ 4. DECLARATION ══════════════════════════════════════════════ */}
         <div className="bg-white rounded-xl border border-gray-100 p-6 md:p-8">
           <label className="flex items-start cursor-pointer select-none group">
             <input
@@ -768,28 +744,36 @@ export default function Review() {
           )}
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════════════
-            ACTION BUTTONS
-        ═══════════════════════════════════════════════════════════════════ */}
+        {/* Submit error */}
+        {submitError && (
+          <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600 text-center">
+            {submitError}
+          </div>
+        )}
+
+        {/* ═══ ACTION BUTTONS ══════════════════════════════════════════════ */}
         <div className="w-full flex justify-between gap-4 border-t border-slate-200/60 pt-6">
           <button
             onClick={() => router.back()}
-            disabled={anyEditing}
+            disabled={anyEditing || isSubmitting}
             className="bg-gray-500 text-white px-8 py-3 rounded cursor-pointer transition-colors hover:bg-gray-600 disabled:opacity-50"
           >
             Back
           </button>
 
           <button
-            disabled={!agreed || anyEditing}
-            onClick={() => router.push("/register/submitted")}
-            className={`px-10 py-3 rounded text-white font-semibold transition-all ${
-              agreed && !anyEditing
+            disabled={!agreed || anyEditing || isSubmitting}
+            onClick={handleSubmit}
+            className={`px-10 py-3 rounded text-white font-semibold transition-all flex items-center gap-2 ${
+              agreed && !anyEditing && !isSubmitting
                 ? "bg-blue-600 hover:bg-blue-700 cursor-pointer"
                 : "bg-blue-300 cursor-not-allowed"
             }`}
           >
-            Submit Application
+            {isSubmitting && (
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            )}
+            {isSubmitting ? "Submitting..." : "Submit Application"}
           </button>
         </div>
 

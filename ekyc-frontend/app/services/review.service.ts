@@ -81,7 +81,6 @@ export const reviewApplicationService = {
 
 
   async updateBasicProfile(payload: UpdateBasicProfilePayload): Promise<void> {
-    // Assuming your base apiClient handles interceptors and response text wrappers
     await apiClient.post("/basic-info", payload);
   },
 
@@ -90,8 +89,11 @@ export const reviewApplicationService = {
     await apiClient.post("/nominees/update-all", payload); 
   },
 
-  // 🌟 NEW METHOD: Update BO profile choices and market segment rights
   async updateBoAccounts(payload: UpdateBoAccountsPayload): Promise<void> {
     await apiClient.post("/bo-account/save", payload);
-  }
+  },
+
+  async submitApplication(): Promise<void> {
+    await apiClient.post("/submit");
+  },
 };

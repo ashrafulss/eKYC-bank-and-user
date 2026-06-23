@@ -19,3 +19,19 @@ export const getApplicationReviewSummary = asyncHandler(async (req: Request, res
 
   ApiResponse.ok(res, data, "Review configuration summary payload aggregated successfully.");
 });
+
+export const submitApplication = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.customer?.id;
+  if (!userId) {
+    throw new BadRequestError("Customer ID not found in request.");
+  }
+
+  const applicationId = req.customer?.id;
+  if (!applicationId) {
+    throw new BadRequestError("No active application found for this customer.");
+  }
+
+  await reviewService.submitApplication(applicationId);
+
+  ApiResponse.ok(res, null, "Application submitted successfully. Awaiting bank approval.");
+});
