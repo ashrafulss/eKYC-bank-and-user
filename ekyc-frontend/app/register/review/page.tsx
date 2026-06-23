@@ -752,14 +752,14 @@ export default function Review() {
         )}
 
         {/* ═══ ACTION BUTTONS ══════════════════════════════════════════════ */}
-        <div className="w-full flex justify-between gap-4 border-t border-slate-200/60 pt-6">
-          <button
+        <div className="w-full flex justify-end gap-4 border-t border-slate-200/60 pt-6">
+          {/* <button
             onClick={() => router.back()}
             disabled={anyEditing || isSubmitting}
             className="bg-gray-500 text-white px-8 py-3 rounded cursor-pointer transition-colors hover:bg-gray-600 disabled:opacity-50"
           >
             Back
-          </button>
+          </button> */}
 
           <button
             disabled={!agreed || anyEditing || isSubmitting}

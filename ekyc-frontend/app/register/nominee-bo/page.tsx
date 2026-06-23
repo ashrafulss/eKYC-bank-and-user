@@ -501,14 +501,14 @@ export default function NomineeBo() {
         </div>
 
         {/* Footer Navigation Section */}
-        <div className="w-full mt-8 flex justify-between items-center border-t border-gray-200 pt-6">
-          <button
+        <div className="w-full mt-8 flex justify-end items-center border-t border-gray-200 pt-6">
+          {/* <button
             onClick={() => router.back()}
             disabled={isSubmitting}
             className="bg-gray-500 text-white px-8 py-3 rounded text-sm font-medium disabled:opacity-50"
           >
             Back
-          </button>
+          </button> */}
           <button
             onClick={handleFormSubmission}
             disabled={isSubmitting}

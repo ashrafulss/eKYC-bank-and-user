@@ -172,34 +172,55 @@ let stepToAssign = "phone_number_verified";
 }
 
 
-  async refreshUserToken(refreshToken: string) {
-    let decoded;
-    try {
-      decoded = verifyRefreshToken(refreshToken);
-    } catch {
-      throw new Error("INVALID_REFRESH_TOKEN");
-    }
+async refreshUserToken(refreshToken: string) {
+  let decoded;
+  try {
+    decoded = verifyRefreshToken(refreshToken);
+  } catch {
+    throw new Error("INVALID_REFRESH_TOKEN");
+  }
 
-    const session = await this.authRepository.findValidSession(refreshToken);
-    if (!session) {
-      await this.authRepository.deleteAllUserSessions(decoded.id);
+  let session = await this.authRepository.findValidSession(refreshToken);
+  
+  if (!session) {
+    const userProfile = await this.authRepository.findFullUserById(decoded.id);
+    if (!userProfile) {
       throw new Error("SESSION_REVOKED");
     }
-    await this.authRepository.deleteSession(refreshToken);
-
-    const newAccessToken = signAccessToken({
+    
+    const currentStep = userProfile.current_step || decoded.current_step || "phone_number_verified";
+    
+    const fallbackAccessToken = signAccessToken({
       id: decoded.id,
       type: "customer",
-    });
-    const newRefreshToken = signRefreshToken({
-      id: decoded.id,
-      type: "customer",
+      current_step: currentStep, 
     });
 
-    await this.authRepository.createUserSession(decoded.id, newRefreshToken);
-
-    return { accessToken: newAccessToken, refreshToken: newRefreshToken };
+    return { accessToken: fallbackAccessToken, refreshToken: null };
   }
+
+  await this.authRepository.deleteSession(refreshToken);
+
+  const userProfile = await this.authRepository.findFullUserById(decoded.id);
+  const currentStep = userProfile?.current_step || decoded.current_step || "phone_number_verified";
+
+
+  const newAccessToken = signAccessToken({
+    id: decoded.id,
+    type: "customer",
+    current_step: currentStep, 
+  });
+
+  const newRefreshToken = signRefreshToken({
+    id: decoded.id,
+    type: "customer",
+    current_step: currentStep, 
+  });
+
+  await this.authRepository.createUserSession(decoded.id, newRefreshToken);
+
+  return { accessToken: newAccessToken, refreshToken: newRefreshToken };
+}
 
   async logoutCustomer(refreshToken: string): Promise<void> {
     if (!refreshToken) return;
