@@ -27,9 +27,6 @@ export const sendOTP = asyncHandler(async (req: Request, res: Response) => {
 });
 
 
-
-// backend/modules/auth/auth.controller.ts
-
 export const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
   const { mobile, otpCode } = req.body;
 
@@ -49,7 +46,6 @@ export const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
 
   const isProduction = process.env.NODE_ENV === "production";
 
-  // 1. Access Token Cookie (Visible to Frontend API client)
   res.cookie("next_auth_session", result.accessToken, {
     httpOnly: false,
     secure: isProduction,
@@ -67,13 +63,11 @@ export const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
     path: "/",
   });
 
-  // 🌟 FIX 1: Save the Refresh Token into a secure, HttpOnly cookie jar!
-  // This ensures it survives page reloads without needing localStorage.
   res.cookie("next_refresh_token", result.refreshToken, {
-    httpOnly: true, // Secure: Invisible to frontend JavaScript
+    httpOnly: true, 
     secure: isProduction,
     sameSite: "strict",
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    maxAge: 24 * 60 * 60 * 1000, 
     path: "/",
   });
 
@@ -87,7 +81,6 @@ export const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
 
 export const refreshToken = asyncHandler(
   async (req: Request, res: Response) => {
-    // 🌟 Added optional chaining (?.) so it returns undefined instead of crashing
     const tokenPayload = req.body.refreshToken || req.cookies?.next_refresh_token;
 
     if (!tokenPayload) {
@@ -103,25 +96,26 @@ export const refreshToken = asyncHandler(
 
     const isProduction = process.env.NODE_ENV === "production";
     
-    if (result && result.accessToken) {
-      res.cookie("next_auth_session", result.accessToken, {
-        httpOnly: false,
-        secure: isProduction,
-        sameSite: "strict",
-        maxAge: 30 * 60 * 1000, 
-        path: "/",
-      });
+if (result && result.accessToken) {
+  res.cookie("next_auth_session", result.accessToken, {
+    httpOnly: false,
+    secure: isProduction,
+    sameSite: "strict",
+    maxAge: 30 * 60 * 1000, 
+    path: "/",
+  });
 
-      if (result.refreshToken) {
-        res.cookie("next_refresh_token", result.refreshToken, {
-          httpOnly: true,
-          secure: isProduction,
-          sameSite: "strict",
-          maxAge: 24 * 60 * 60 * 1000,
-          path: "/",
-        });
-      }
-    }
+ 
+  if (result.refreshToken) {
+    res.cookie("next_refresh_token", result.refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: "strict",
+      maxAge: 24 * 60 * 60 * 1000,
+      path: "/",
+    });
+  }
+}
 
     ApiResponse.ok(res, result, "Token refreshed successfully");
   },

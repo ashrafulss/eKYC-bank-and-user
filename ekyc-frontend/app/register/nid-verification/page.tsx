@@ -269,14 +269,15 @@ export default function NIDVerification() {
         />
       </div>
 
-      <div className="w-full flex flex-col sm:flex-row justify-between gap-4 border-t border-slate-200/60 mt-10 pt-6 pb-24">
-        <button
+      <div className="w-full flex flex-col sm:flex-row justify-end gap-4 border-t border-slate-200/60 mt-10 pt-6 pb-24">
+        {/* <button
+        hidden
           onClick={() => router.back()}
           disabled={isSubmitting}
           className="bg-gray-500 text-white px-8 py-3 rounded cursor-pointer transition-colors hover:bg-gray-600 disabled:opacity-50"
         >
           Back
-        </button>
+        </button> */}
 
         <div className="flex flex-col items-end gap-2 w-full sm:w-auto">
           <button

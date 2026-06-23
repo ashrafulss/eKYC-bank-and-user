@@ -387,14 +387,14 @@ export default function BasicInformations() {
         </form>
 
         {/* Global Footer Buttons */}
-        <div className="w-full mt-8 flex flex-col sm:flex-row justify-between items-center border-t border-gray-200 pt-6 gap-4">
-          <button
+        <div className="w-full mt-8 flex flex-col sm:flex-row justify-end items-center border-t border-gray-200 pt-6 gap-4">
+          {/* <button
             onClick={() => router.back()}
             disabled={submitting}
             className="w-full sm:w-auto bg-gray-500 text-white px-8 py-3 rounded cursor-pointer hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Back
-          </button>
+          </button> */}
 
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto justify-end">
             <button
