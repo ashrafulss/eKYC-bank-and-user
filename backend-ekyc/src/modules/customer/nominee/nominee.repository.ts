@@ -71,24 +71,58 @@ export const nomineeRepository = {
   },
 
   // 🌟 PHASE 2: Updates edited values and clears older entries for this application session
-  async clearAndUpsertNominees(userId: string, nomineesList: DBNomineePayload[], client: PoolClient) {
-    const applicationId = await this.getApplicationId(userId, client);
-    
-    // Clear previously saved text configurations to avoid duplication issues on re-submit
-    await client.query(`DELETE FROM public.nominees WHERE application_id = $1`, [applicationId]);
+// 🌟 PHASE 2: Updates edited values without destroying existing document associations
+async clearAndUpsertNominees(userId: string, nomineesList: DBNomineePayload[], client: PoolClient) {
+  const applicationId = await this.getApplicationId(userId, client);
+  
+  // 1. Get all current nominees for this application before making changes
+  const existingNomineesResult = await client.query(
+    `SELECT id, nid_passport FROM public.nominees WHERE application_id = $1`,
+    [applicationId]
+  );
+  const existingNominees = existingNomineesResult.rows;
 
-    let count = 0;
-    for (const nom of nomineesList) {
+  // Track active NIDs coming from the form payload
+  const activeNidPassports = nomineesList.map(nom => nom.nidPassport).filter(Boolean);
+
+  // 2. Delete ONLY the nominees that the user completely removed from the UI form setup
+  if (activeNidPassports.length > 0) {
+    await client.query(
+      `DELETE FROM public.nominees 
+       WHERE application_id = $1 AND nid_passport NOT IN (${activeNidPassports.map((_, i) => `$${i + 2}`).join(", ")})`,
+      [applicationId, ...activeNidPassports]
+    );
+  } else {
+    // If the list is empty or all skipped, clear nominees safely
+    await client.query(`DELETE FROM public.nominees WHERE application_id = $1`, [applicationId]);
+  }
+
+  let count = 0;
+  for (const nom of nomineesList) {
+    // 3. Check if this specific nominee already exists in the database snapshot
+    const existing = existingNominees.find(e => e.nid_passport === nom.nidPassport);
+
+    if (existing) {
+      // 🌟 UPDATE: Overwrite text form configurations without touching the primary key ID
+      await client.query(
+        `UPDATE public.nominees 
+         SET name = $1, relationship = $2, date_of_birth = $3, share_percent = $4, contact = $5, nid_skipped = $6, updated_at = NOW()
+         WHERE id = $7`,
+        [nom.name, nom.relationship, nom.dateOfBirth, nom.sharePercent, nom.contact, nom.nidSkipped ?? false, existing.id]
+      );
+    } else {
+      // 🌟 INSERT: Create a fresh record if it's a completely brand new nominee structure row
       await client.query(
         `INSERT INTO public.nominees (
           application_id, name, relationship, nid_passport, date_of_birth, share_percent, contact, nid_skipped, updated_at
          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
         [applicationId, nom.name, nom.relationship, nom.nidPassport, nom.dateOfBirth, nom.sharePercent, nom.contact, nom.nidSkipped ?? false]
       );
-      count++;
     }
-    return count;
-  },
+    count++;
+  }
+  return count;
+},
 
   async advanceStepToNomineeDone(userId: string, client: PoolClient) {
     await client.query(
