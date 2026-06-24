@@ -198,7 +198,7 @@ export default function UserDashboard() {
                   />
                 </svg>
                 <div>
-                  <p className="text-white text-xs font-bold">KYC Pending</p>
+                  <p className="text-white text-xs font-bold">KYC {user?.kycStatus}</p>
                 </div>
               </div>
             </div>
@@ -210,7 +210,7 @@ export default function UserDashboard() {
                 value={user?.accountType ?? "—"}
                 icon="🏦"
               />
-              <StatCard label="KYC Status" value="Pending" icon="✅" green />
+              <StatCard label="KYC Status" value={user?.kycStatus} icon="✅" green />
               <StatCard
                 label="Trading Access"
                 value={user?.tradingPermissions?.join(", ") ?? "—"}
