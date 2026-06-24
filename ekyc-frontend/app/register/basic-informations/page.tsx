@@ -27,7 +27,7 @@ export default function BasicInformations() {
   });
 
   const [loading, setLoading] = useState<boolean>(true);
-  const [submitting, setSubmitting] = useState<boolean>(false); // 🌟 Added submission state tracking
+  const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -64,7 +64,6 @@ export default function BasicInformations() {
     }));
   };
 
-  // 🌟 ADDED: Handle form submission to database before pushing navigation router state
   const handleNextStep = async () => {
     if (!isFormValid() || submitting) return;
     
@@ -72,10 +71,7 @@ export default function BasicInformations() {
       setSubmitting(true);
       setErrorMessage(null);
       
-      // Save form records to the database backend
       await basicInformationService.updateBasicInformations(formData);
-      
-      // Advance user step routing forward
       router.push("/register/nominee-bo");
     } catch (error: any) {
       console.error("Failed to persist basic info amendments:", error);
@@ -114,175 +110,157 @@ export default function BasicInformations() {
     );
   }
 
+  // Common Tailwind classes for fields locked down by NID verification
+  const readOnlyInputStyles = "w-full sm:col-span-2 px-3 py-2 bg-slate-100 border border-gray-200 rounded-md text-sm text-gray-500 cursor-not-allowed select-none focus:outline-hidden";
+
   return (
     <div className="w-full min-h-screen bg-slate-50 overflow-y-auto py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
         
-        {/* Error Alert Bar */}
         {errorMessage && (
           <div className="w-full p-4 mb-6 bg-red-50 border-l-4 border-red-500 rounded-r-md text-sm text-red-700">
             <strong>Action Blocked:</strong> {errorMessage}
           </div>
         )}
 
-        {/* Header Block */}
         <div className="w-full mb-2">
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-            Let's provide some primary information
+            Verify your primary information
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Verified fields are automatically filled from your uploaded NID identity cards.
+            These fields have been successfully extracted and verified from your uploaded NID identity card.
           </p>
         </div>
 
-        {/* Form Container */}
         <form
           onSubmit={(e) => e.preventDefault()}
           className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch"
         >
-          {/* ─── LEFT COLUMN: PERSONAL INFORMATION ─── */}
+          {/* ─── LEFT COLUMN: PERSONAL INFORMATION (ALL READ-ONLY) ─── */}
           <div className="bg-white rounded-xl shadow-xs border border-gray-100 p-6 md:p-8 space-y-6 flex flex-col justify-between">
             <div>
-              <h2 className="text-xs font-bold tracking-wider text-cyan-700 uppercase border-b border-gray-100 pb-2 mb-6">
-                Personal Information
-              </h2>
+              <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-6">
+                <h2 className="text-xs font-bold tracking-wider text-cyan-700 uppercase">
+                  Personal Information
+                </h2>
+                <span className="text-[10px] bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold px-2 py-0.5 rounded-sm flex items-center gap-1">
+                  🔒 NID Verified
+                </span>
+              </div>
 
               <div className="space-y-4">
                 {/* Full Name (English) */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                  <label className="text-sm font-medium text-gray-500">
-                    Full Name (English) <span className="text-red-500">*</span>
+                  <label className="text-sm font-medium text-gray-400">
+                    Full Name (English)
                   </label>
                   <input
                     type="text"
                     value={formData.fullNameEnglish}
-                    onChange={(e) =>
-                      handleChange("fullNameEnglish", e.target.value)
-                    }
-                    className="w-full sm:col-span-2 px-3 py-2 bg-slate-50 border border-gray-200 rounded-md text-sm text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                    readOnly
+                    className={readOnlyInputStyles}
                   />
                 </div>
 
                 {/* Full Name (Bangla) */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                  <label className="text-sm font-medium text-gray-500">
-                    Full Name (Bangla) <span className="text-red-500">*</span>
+                  <label className="text-sm font-medium text-gray-400">
+                    Full Name (Bangla)
                   </label>
                   <input
                     type="text"
                     value={formData.fullNameBangla}
-                    onChange={(e) => {
-                      const filteredValue = e.target.value.replace(
-                        /[^\u0980-\u09FF\s]/g,
-                        "",
-                      );
-                      handleChange("fullNameBangla", filteredValue);
-                    }}
-                    placeholder="এখানে আপনার নাম লিখুন"
-                    className="w-full sm:col-span-2 px-3 py-2 bg-slate-50 border border-gray-200 rounded-md text-sm text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                    readOnly
+                    className={readOnlyInputStyles}
                   />
                 </div>
 
                 {/* Father's Name */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                  <label className="text-sm font-medium text-gray-500">
-                    Father's Name (Bangla){" "}
-                    <span className="text-red-500">*</span>
+                  <label className="text-sm font-medium text-gray-400">
+                    Father's Name (Bangla)
                   </label>
                   <input
                     type="text"
                     value={formData.fatherNameBangla}
-                    onChange={(e) => {
-                      const filteredValue = e.target.value.replace(
-                        /[^\u0980-\u09FF\s]/g,
-                        "",
-                      );
-                      handleChange("fatherNameBangla", filteredValue);
-                    }}
-                    className="w-full sm:col-span-2 px-3 py-2 bg-slate-50 border border-gray-200 rounded-md text-sm text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                    readOnly
+                    className={readOnlyInputStyles}
                   />
                 </div>
 
                 {/* Mother's Name */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                  <label className="text-sm font-medium text-gray-500">
-                    Mother's Name (Bangla){" "}
-                    <span className="text-red-500">*</span>
+                  <label className="text-sm font-medium text-gray-400">
+                    Mother's Name (Bangla)
                   </label>
                   <input
                     type="text"
                     value={formData.motherNameBangla}
-                    onChange={(e) => {
-                      const filteredValue = e.target.value.replace(
-                        /[^\u0980-\u09FF\s]/g,
-                        "",
-                      );
-                      handleChange("motherNameBangla", filteredValue);
-                    }}
-                    className="w-full sm:col-span-2 px-3 py-2 bg-slate-50 border border-gray-200 rounded-md text-sm text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                    readOnly
+                    className={readOnlyInputStyles}
                   />
                 </div>
 
                 {/* Date of Birth */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                  <label className="text-sm font-medium text-gray-500">
-                    Date of Birth <span className="text-red-500">*</span>
+                  <label className="text-sm font-medium text-gray-400">
+                    Date of Birth
                   </label>
                   <input
                     type="date"
                     value={formData.dob}
-                    onChange={(e) => handleChange("dob", e.target.value)}
-                    className="w-full sm:col-span-2 px-3 py-2 bg-slate-50 border border-gray-200 rounded-md text-sm text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                    readOnly
+                    className={readOnlyInputStyles}
                   />
                 </div>
 
                 {/* Gender */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                  <label className="text-sm font-medium text-gray-500">
+                  <label className="text-sm font-medium text-gray-400">
                     Gender
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={formData.gender}
-                    onChange={(e) => handleChange("gender", e.target.value)}
-                    className="w-full sm:col-span-2 px-3 py-2 bg-slate-50 border border-gray-200 rounded-md text-sm text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:bg-white"
-                  >
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                  </select>
+                    readOnly
+                    className={readOnlyInputStyles}
+                  />
                 </div>
 
                 {/* NID Number */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                  <label className="text-sm font-medium text-gray-500">
-                    NID Number <span className="text-red-500">*</span>
+                  <label className="text-sm font-medium text-gray-400">
+                    NID Number
                   </label>
                   <input
                     type="text"
                     value={formData.nidNumber}
-                    onChange={(e) => handleChange("nidNumber", e.target.value)}
-                    className="w-full sm:col-span-2 px-3 py-2 bg-slate-50 border border-gray-200 rounded-md text-sm font-mono tracking-wide text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                    readOnly
+                    className={`${readOnlyInputStyles} font-mono tracking-wide`}
                   />
                 </div>
 
                 {/* Mobile Number */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                  <label className="text-sm font-medium text-gray-500">
-                    Mobile Number <span className="text-red-500">*</span>
+                  <label className="text-sm font-medium text-gray-400 flex flex-wrap items-center">
+                    <span>Mobile Number</span>
+                    <span className="text-[10px] ml-1 text-emerald-600 font-semibold block sm:inline">
+                      (Verified)
+                    </span>
                   </label>
                   <input
                     type="tel"
                     value={formData.mobile}
-                    onChange={(e) => handleChange("mobile", e.target.value)}
-                    className="w-full sm:col-span-2 px-3 py-2 bg-slate-50 border border-gray-200 rounded-md text-sm text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                    readOnly
+                    className={readOnlyInputStyles}
                   />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* ─── RIGHT COLUMN: CONTACT & EMPLOYMENT ─── */}
-          <div className="bg-white rounded-xl shadow-xs border border-gray-100 p-6 md:p-8 flex flex-col justify-between">
+          {/* ─── RIGHT COLUMN: CONTACT & EMPLOYMENT (STILL EDITABLE) ─── */}
+          <div className="bg-white rounded-xl shadow-xs border border-gray-100 p-6 md:p-8 space-y-6 flex flex-col justify-between">
             <div className="lg:sticky lg:top-6 w-full">
               <h2 className="text-xs font-bold tracking-wider text-cyan-700 uppercase border-b border-gray-100 pb-2 mb-6">
                 Contact & Employment
@@ -388,18 +366,10 @@ export default function BasicInformations() {
 
         {/* Global Footer Buttons */}
         <div className="w-full mt-8 flex flex-col sm:flex-row justify-end items-center border-t border-gray-200 pt-6 gap-4">
-          {/* <button
-            onClick={() => router.back()}
-            disabled={submitting}
-            className="w-full sm:w-auto bg-gray-500 text-white px-8 py-3 rounded cursor-pointer hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Back
-          </button> */}
-
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto justify-end">
             <button
               disabled={!isFormValid() || submitting}
-              onClick={handleNextStep} // 🌟 BOUND TO SUBMISSION ACTION
+              onClick={handleNextStep}
               className={`w-full sm:w-auto px-10 py-3 rounded text-white font-semibold transition-all flex items-center justify-center gap-2 ${
                 isFormValid() && !submitting
                   ? "bg-blue-600 hover:bg-blue-700 cursor-pointer"
