@@ -11,14 +11,16 @@ export interface SaveDocumentPayload {
 }
 
 export interface StaticProfilePayload {
+  nidNumber: string;
   firstName: string;
   lastName: string;
-  fullNameBangla: string;   // 🌟 Added
-  fatherNameBangla: string; // 🌟 Added
-  motherNameBangla: string; // 🌟 Added
+  fullNameBangla: string;
+  fatherNameBangla: string;
+  motherNameBangla: string;
   dateOfBirth: string;
   gender: "male" | "female" | "other";
   nationality: string;
+  mobile: string;
   addressLine1: string;
   district: string;
   division: string;
@@ -57,63 +59,69 @@ export const nidRepository = {
   ) {
     const applicationId = await this.getOrCreateApplicationId(frontPayload.userId, client);
 
-    // 1. Save or Update Demographics (Includes direct mapping for Bangla columns now!)
+    // 1. Save or Update Personal Info
     await client.query(
       `INSERT INTO public.personal_info (
-        application_id, 
-        first_name, 
-        last_name, 
-        full_name_bangla, 
-        father_name_bangla, 
-        mother_name_bangla, 
-        date_of_birth, 
-        gender, 
-        nationality, 
+        application_id,
+        nid_number,
+        first_name,
+        last_name,
+        full_name_bangla,
+        father_name_bangla,
+        mother_name_bangla,
+        date_of_birth,
+        gender,
+        nationality,
+        mobile,
         updated_at
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::public.biological_gender, $9, NOW())
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::public.biological_gender, $10, $11, NOW())
        ON CONFLICT (application_id) DO UPDATE SET
-         first_name = EXCLUDED.first_name,
-         last_name = EXCLUDED.last_name,
-         full_name_bangla = EXCLUDED.full_name_bangla,
+         nid_number         = EXCLUDED.nid_number,
+         first_name         = EXCLUDED.first_name,
+         last_name          = EXCLUDED.last_name,
+         full_name_bangla   = EXCLUDED.full_name_bangla,
          father_name_bangla = EXCLUDED.father_name_bangla,
          mother_name_bangla = EXCLUDED.mother_name_bangla,
-         date_of_birth = EXCLUDED.date_of_birth,
-         gender = EXCLUDED.gender,
-         updated_at = NOW()`,
+         date_of_birth      = EXCLUDED.date_of_birth,
+         gender             = EXCLUDED.gender,
+         mobile             = EXCLUDED.mobile,
+         updated_at         = NOW()`,
       [
         applicationId,
+        staticProfile.nidNumber,
         staticProfile.firstName,
         staticProfile.lastName,
-        staticProfile.fullNameBangla,   // $4
-        staticProfile.fatherNameBangla, // $5
-        staticProfile.motherNameBangla, // $6
-        staticProfile.dateOfBirth,      // $7
-        staticProfile.gender,           // $8
-        staticProfile.nationality       // $9
+        staticProfile.fullNameBangla,
+        staticProfile.fatherNameBangla,
+        staticProfile.motherNameBangla,
+        staticProfile.dateOfBirth,
+        staticProfile.gender,
+        staticProfile.nationality,
+        staticProfile.mobile,
       ]
     );
 
-    // 2. Save or Update Demographics Addresses (address_info Table Mapping)
+    // 2. Save or Update Address Info
     await client.query(
       `INSERT INTO public.address_info (
         application_id, address_line1, district, division, postal_code, updated_at
        ) VALUES ($1, $2, $3, $4, $5, NOW())
        ON CONFLICT (application_id) DO UPDATE SET
          address_line1 = EXCLUDED.address_line1,
-         district = EXCLUDED.district,
-         division = EXCLUDED.division,
-         postal_code = EXCLUDED.postal_code,
-         updated_at = NOW()`,
+         district      = EXCLUDED.district,
+         division      = EXCLUDED.division,
+         postal_code   = EXCLUDED.postal_code,
+         updated_at    = NOW()`,
       [
         applicationId,
         staticProfile.addressLine1,
         staticProfile.district,
         staticProfile.division,
-        staticProfile.postalCode
+        staticProfile.postalCode,
       ]
     );
 
-    // Helper method execution context to insert individual files safely
+    // 3. Insert Document Records
     const insertDocumentRecord = async (payload: SaveDocumentPayload) => {
       await client.query(
         `UPDATE public.user_documents 
@@ -132,7 +140,8 @@ export const nidRepository = {
 
       const insertQuery = await client.query(
         `INSERT INTO public.user_documents (
-          application_id, doc_type, file_url, file_name, file_size, mime_type, version, is_latest, ocr_data, uploaded_at
+          application_id, doc_type, file_url, file_name, file_size,
+          mime_type, version, is_latest, ocr_data, uploaded_at
          ) VALUES ($1, $2::public.applicant_document_type, $3, $4, $5, $6, $7, true, $8, NOW())
          RETURNING id, doc_type, version, is_latest`,
         [
@@ -143,16 +152,16 @@ export const nidRepository = {
           payload.fileSize,
           payload.mimeType,
           nextVersion,
-          JSON.stringify(payload.ocrData)
+          JSON.stringify(payload.ocrData),
         ]
       );
       return insertQuery.rows[0];
     };
 
     const frontDoc = await insertDocumentRecord(frontPayload);
-    const backDoc = await insertDocumentRecord(backPayload);
+    const backDoc  = await insertDocumentRecord(backPayload);
 
-    // 3. Advance state pipeline status safely
+    // 4. Advance user step
     await client.query(
       `UPDATE public.users 
        SET current_step = 'nid_verified'::public.registration_step, updated_at = NOW() 
@@ -161,5 +170,5 @@ export const nidRepository = {
     );
 
     return [frontDoc, backDoc];
-  }
+  },
 };

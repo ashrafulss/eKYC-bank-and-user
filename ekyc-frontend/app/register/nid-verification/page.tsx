@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import React, { useRef, useState } from "react";
 import { useAuth } from "@/app/context/auth-context";
 
-
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];
 const MAX_SIZE_MB = 5;
@@ -37,7 +36,6 @@ export default function NIDVerification() {
 
   const { user, refetchUser } = useAuth();
   
-  // Note: These states will now hold the raw base64 data strings directly
   const [frontImage, setFrontImage] = useState<string | null>(null);
   const [backImage, setBackImage] = useState<string | null>(null);
   
@@ -49,7 +47,7 @@ export default function NIDVerification() {
   const [frontError, setFrontError] = useState<string | null>(null);
   const [backError, setBackError] = useState<string | null>(null);
 
-  // 🌟 NEW STATES: Track network operations and API submission errors
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
 
@@ -73,7 +71,7 @@ export default function NIDVerification() {
     backInputRef.current?.click();
   };
 
-  // 🌟 HELPER FUNCTION: Converts a native browser file into a Base64 string safely
+
   const convertFileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -96,7 +94,6 @@ export default function NIDVerification() {
 
     try {
       setFrontError(null);
-      // Convert browsed file directly into base64 string for the backend
       const base64Str = await convertFileToBase64(file);
       setFrontImage(base64Str);
     } catch (err) {
@@ -117,7 +114,7 @@ export default function NIDVerification() {
 
     try {
       setBackError(null);
-      // Convert browsed file directly into base64 string for the backend
+
       const base64Str = await convertFileToBase64(file);
       setBackImage(base64Str);
     } catch (err) {
@@ -148,7 +145,6 @@ export default function NIDVerification() {
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0);
 
-    // canvas.toDataURL generates a perfect "data:image/png;base64,..." string natively
     const imageData = canvas.toDataURL("image/png");
     if (activeCamera === "front") setFrontImage(imageData);
     else if (activeCamera === "back") setBackImage(imageData);
@@ -163,10 +159,9 @@ export default function NIDVerification() {
     setActiveCamera(null);
   };
 
-  // Ensure button remains disabled while API submission request is actively pending
   const canProceed = !!frontImage && !!backImage && !isSubmitting;
 
-  // 🌟 SUBMISSION LOGIC: Sends both base64 images to your Express application
+
   const handleSubmit = async () => {
     if (!frontImage || !backImage) return;
 
@@ -174,15 +169,11 @@ export default function NIDVerification() {
     setGlobalError(null);
 
     try {
-      // 1. Fire post request via your auth service client wrapper
       await nidService.uploadNidDocuments({
         frontImage,
         backImage,
       });
-
-      // 2. Clear out any errors and proceed forward
       await refetchUser(); 
-      // Express drops the fresh 'reg_step=nid_verified' cookie, allowing your proxy file to accept this step!
       router.push("/register/selfie");
     } catch (err: any) {
       console.error("❌ Submission failed:", err);
@@ -200,8 +191,6 @@ export default function NIDVerification() {
         <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
           Let's Upload/Capture NID Image
         </h1>
-
-        {/* 🌟 GLOBAL ERROR BANNER DISPLAY */}
         {globalError && (
           <div className="mt-4 p-4 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm font-medium">
             ⚠️ {globalError}

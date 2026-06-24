@@ -1,4 +1,3 @@
-version: "3.8"
 
 services:
   postgres_second:
@@ -14,6 +13,17 @@ services:
       - ./pgdata_second:/var/lib/postgresql/data
       - ./migrations/init.sql:/docker-entrypoint-initdb.d/init.sql
 
+  mock-apis:
+    build:
+      context: ../mockoon
+      dockerfile: Dockerfile
+    container_name: mockoon_service
+    ports:
+      - "3002:3002"
+    volumes:
+      - ../mockoon/data:/data:ro
+    restart: always
+
   backend_api:
     image: node:20-alpine
     container_name: ekyc_backend_api
@@ -27,6 +37,8 @@ services:
       - .env
     depends_on:
       - postgres_second
+      - mock-apis
     environment:
       - PORT=5000
       - DATABASE_URL=postgres://postgres:sa@postgres_second:5432/ekyc
+      - NID_OCR_URL=http://mockoon_service:3002/api/v1/nid/info
