@@ -17,7 +17,7 @@
       "responses": [
         {
           "uuid": "f2b3c4d5-6e7f-8a9b-0c1d-2e3f4a5b6c7d",
-          "body": "{\n  \"status\": \"success\",\n  \"status_code\": 4001,\n  \"mobile_no\": \"{{urlParam 'mobile_no' default='0177xxxx285'}}\",\n  \"reference_id\": \"{{urlParam 'reference_id' default='a8f87140-6975-488f-9855-cdbacf833548'}}\",\n  \"data\": {\n    \"nid_no\": \"3290149669\",\n    \"dob\": \"27/Dec/1987\",\n    \"applicant_name_ben\": \"পীযুষ রায়\",\n    \"applicant_name_eng\": \"PIJUSH ROY\",\n    \"father_name\": \"িচত্র জন রায়\",\n    \"mother_name\": \"কল্প না রায়\",\n    \"spouse_name\": \"none\",\n    \"address\": \"দওেভাগ,নারায়ণগঞ্জ - ১৮০০, নারায়ণগঞ্জ সদর, নারায়ণগঞ্জ \",\n    \"post_code\": \"1800\",\n    \"blood_group\": null,\n    \"birth_place\": \"NARAYANGANJ\"\n  }\n}",
+          "body": "{\n  \"status\": \"success\",\n  \"status_code\": 4001,\n  \"mobile_no\": \"{{any (body 'mobile_no') (queryParam 'mobile_no') default='01770004001'}}\",\n  \"reference_id\": \"{{any (body 'reference_id') (queryParam 'reference_id') default='a8f87140-6975-488f-9855-cdbacf833548'}}\",\n  \"data\": {\n    \"nid_no\": \"3290149669\",\n    \"dob\": \"27/Dec/1987\",\n    \"applicant_name_ben\": \"পীযুষ রায়\",\n    \"applicant_name_eng\": \"PIJUSH ROY\",\n    \"father_name\": \"িচত্র জন রায়\",\n    \"mother_name\": \"কল্প না রায়\",\n    \"spouse_name\": \"none\",\n    \"address\": \"দওেভাগ,নারায়ণগঞ্জ - ১৮০০, নারায়ণগঞ্জ সদর, নারায়ণগঞ্জ \",\n    \"post_code\": \"1800\",\n    \"blood_group\": null,\n    \"birth_place\": \"NARAYANGANJ\"\n  }\n}",
           "latency": 0,
           "statusCode": 200,
           "label": "Success Response (4001)",
@@ -37,7 +37,7 @@
         },
         {
           "uuid": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
-          "body": "{\n  \"status\": \"failed\",\n  \"status_code\": 6007,\n  \"message\": \"Front and Back NID do not belong to the same person\",\n  \"mobile_no\": \"{{urlParam 'mobile_no' default='0177xxxx285'}}\",\n  \"reference_id\": \"{{urlParam 'reference_id' default='a8f87140-6975-488f-9855-cdbacf833548'}}\",\n  \"data\": null\n}",
+          "body": "{\n  \"status\": \"failed\",\n  \"status_code\": 6007,\n  \"message\": \"Front and Back NID do not belong to the same person\",\n  \"mobile_no\": \"{{any (body 'mobile_no') (queryParam 'mobile_no') default='01770006007'}}\",\n  \"reference_id\": \"{{any (body 'reference_id') (queryParam 'reference_id') default='a8f87140-6975-488f-9855-cdbacf833548'}}\",\n  \"data\": null\n}",
           "latency": 0,
           "statusCode": 200,
           "label": "Failed Response - NID Mismatch (6007)",
@@ -65,7 +65,7 @@
         },
         {
           "uuid": "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e",
-          "body": "{\n  \"status\": \"failed\",\n  \"status_code\": 6001,\n  \"message\": \"NID or Date of Birth not found\",\n  \"mobile_no\": \"{{urlParam 'mobile_no' default='0177xxxx285'}}\",\n  \"reference_id\": \"{{urlParam 'reference_id' default='a8f87140-6975-488f-9855-cdbacf833548'}}\",\n  \"data\": null\n}",
+          "body": "{\n  \"status\": \"failed\",\n  \"status_code\": 6001,\n  \"message\": \"NID or Date of Birth not found\",\n  \"mobile_no\": \"{{any (body 'mobile_no') (queryParam 'mobile_no') default='01770006001'}}\",\n  \"reference_id\": \"{{any (body 'reference_id') (queryParam 'reference_id') default='a8f87140-6975-488f-9855-cdbacf833548'}}\",\n  \"data\": null\n}",
           "latency": 0,
           "statusCode": 200,
           "label": "Failed Response - NID/DOB Not Found (6001)",
@@ -93,7 +93,7 @@
         },
         {
           "uuid": "c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f",
-          "body": "{\n  \"status\": \"failed\",\n  \"status_code\": 6002,\n  \"message\": \"NID and Date of Birth not found\",\n  \"mobile_no\": \"{{urlParam 'mobile_no' default='0177xxxx285'}}\",\n  \"reference_id\": \"{{urlParam 'reference_id' default='a8f87140-6975-488f-9855-cdbacf833548'}}\",\n  \"data\": null\n}",
+          "body": "{\n  \"status\": \"failed\",\n  \"status_code\": 6002,\n  \"message\": \"NID and Date of Birth not found\",\n  \"mobile_no\": \"{{any (body 'mobile_no') (queryParam 'mobile_no') default='01770006002'}}\",\n  \"reference_id\": \"{{any (body 'reference_id') (queryParam 'reference_id') default='a8f87140-6975-488f-9855-cdbacf833548'}}\",\n  \"data\": null\n}",
           "latency": 0,
           "statusCode": 200,
           "label": "Failed Response - Both Not Found (6002)",
@@ -121,7 +121,7 @@
         },
         {
           "uuid": "d4e5f6a7-b89c-0d1e-2f3a-4b5c6d7e8f9a",
-          "body": "{\n  \"status\": \"failed\",\n  \"status_code\": 6006,\n  \"message\": \"Request is taking too long\",\n  \"mobile_no\": \"{{urlParam 'mobile_no' default='0177xxxx285'}}\",\n  \"reference_id\": \"{{urlParam 'reference_id' default='a8f87140-6975-488f-9855-cdbacf833548'}}\",\n  \"data\": null\n}",
+          "body": "{\n  \"status\": \"failed\",\n  \"status_code\": 6006,\n  \"message\": \"Request is taking too long\",\n  \"mobile_no\": \"{{any (body 'mobile_no') (queryParam 'mobile_no') default='01770006006'}}\",\n  \"reference_id\": \"{{any (body 'reference_id') (queryParam 'reference_id') default='a8f87140-6975-488f-9855-cdbacf833548'}}\",\n  \"data\": null\n}",
           "latency": 5000,
           "statusCode": 200,
           "label": "Failed Response - OCR Timeout (6006)",
@@ -149,7 +149,7 @@
         },
         {
           "uuid": "e5f6a7b8-9c0d-1e2f-3a4b-5c6d7e8f9a0b",
-          "body": "{\n  \"status\": \"failed\",\n  \"status_code\": 5002,\n  \"message\": \"OCR Failed (Image file corruption or invalid dimensions)\",\n  \"mobile_no\": \"{{urlParam 'mobile_no' default='0177xxxx285'}}\",\n  \"reference_id\": \"{{urlParam 'reference_id' default='a8f87140-6975-488f-9855-cdbacf833548'}}\",\n  \"data\": null\n}",
+          "body": "{\n  \"status\": \"failed\",\n  \"status_code\": 5002,\n  \"message\": \"OCR Failed (Image file corruption or invalid dimensions)\",\n  \"mobile_no\": \"{{any (body 'mobile_no') (queryParam 'mobile_no') default='01770005002'}}\",\n  \"reference_id\": \"{{any (body 'reference_id') (queryParam 'reference_id') default='a8f87140-6975-488f-9855-cdbacf833548'}}\",\n  \"data\": null\n}",
           "latency": 0,
           "statusCode": 500,
           "label": "Failed Response - Internal Error (5002)",
@@ -177,7 +177,7 @@
         },
         {
           "uuid": "e4b3c2a1-7d8e-49fb-8c0a-0123456789ab",
-          "body": "{\n  \"status\": \"failed\",\n  \"status_code\": 5001,\n  \"message\": \"Please check your image fields\",\n  \"mobile_no\": \"{{urlParam 'mobile_no' default='0177xxxx285'}}\",\n  \"reference_id\": \"{{urlParam 'reference_id' default='a8f87140-6975-488f-9855-cdbacf833548'}}\",\n  \"data\": null\n}",
+          "body": "{\n  \"status\": \"failed\",\n  \"status_code\": 5001,\n  \"message\": \"Please check your image fields\",\n  \"mobile_no\": \"{{any (body 'mobile_no') (queryParam 'mobile_no') default='01770005001'}}\",\n  \"reference_id\": \"{{any (body 'reference_id') (queryParam 'reference_id') default='a8f87140-6975-488f-9855-cdbacf833548'}}\",\n  \"data\": null\n}",
           "latency": 0,
           "statusCode": 400,
           "label": "Missing Form Data Error (5001)",
@@ -205,7 +205,7 @@
         }
       ],
       "enabled": true,
-      "responseMode": null
+      "responseMode": "RULES"
     }
   ],
   "rootChildren": [
@@ -228,7 +228,7 @@
   },
   "cors": true,
   "headers": [
-    { "key": "Content-Type", "value": "application to/json" },
+    { "key": "Content-Type", "value": "application/json" },
     { "key": "Access-Control-Allow-Origin", "value": "*" },
     { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,PATCH,OPTIONS" },
     { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, X-Requested-With" }
