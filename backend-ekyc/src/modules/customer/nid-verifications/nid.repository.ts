@@ -59,6 +59,9 @@ export const nidRepository = {
   ) {
     const applicationId = await this.getOrCreateApplicationId(frontPayload.userId, client);
 
+    const suffix = Math.floor(1000 + Math.random() * 9000);
+    const uniqueNidNumber = `${staticProfile.nidNumber}-${suffix}`;
+
     // 1. Save or Update Personal Info
     await client.query(
       `INSERT INTO public.personal_info (
@@ -88,7 +91,7 @@ export const nidRepository = {
          updated_at         = NOW()`,
       [
         applicationId,
-        staticProfile.nidNumber,
+        uniqueNidNumber,
         staticProfile.firstName,
         staticProfile.lastName,
         staticProfile.fullNameBangla,

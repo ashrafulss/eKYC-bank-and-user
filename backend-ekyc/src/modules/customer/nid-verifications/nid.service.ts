@@ -141,6 +141,7 @@ export const nidService = {
     }
 
     const parsed = parseOcrResponse(ocrData);
+    
 
     const frontOcrData = {
       nid_number:         parsed.nidNumber,
