@@ -9,6 +9,7 @@ export interface JwtCustomerPayload {
   id: string;
   type: "customer";
   current_step?: string;
+  mobile: string;
 }
 
 export const signAccessToken = (payload: JwtCustomerPayload): string => {

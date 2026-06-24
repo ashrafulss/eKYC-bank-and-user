@@ -59,8 +59,6 @@ async function fetchOcrFromMockoon(
     { headers: { "Content-Type": "multipart/form-data" } }
   );
 
-  console.log("[NID OCR] Mockoon response:", response.data);
-
   if (response.data?.status_code === 4001) {
     return {
       ocrData:     response.data.data,
@@ -119,7 +117,7 @@ export const nidService = {
     userId: string,
     frontBase64: string,
     backBase64: string,
-    userMobile: string = "01700000000"
+    userMobile: string,
   ) {
     const frontFileInfo = await saveBase64Image(frontBase64, userId, "front");
     const backFileInfo  = await saveBase64Image(backBase64,  userId, "back");

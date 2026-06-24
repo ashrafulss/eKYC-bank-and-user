@@ -151,11 +151,13 @@ let stepToAssign = "phone_number_verified";
     id: existingUser.id,
     type: "customer",
     current_step: stepToAssign,
+     mobile: mobile, 
   });
   const refreshToken = signRefreshToken({
     id: existingUser.id,
     type: "customer",
-    current_step: stepToAssign,
+    current_step: stepToAssign, 
+     mobile: mobile, 
   });
 
   const user = await this.authRepository.finalizeVerificationStepAndSession(
@@ -194,6 +196,7 @@ async refreshUserToken(refreshToken: string) {
       id: decoded.id,
       type: "customer",
       current_step: currentStep, 
+      mobile: decoded.mobile, 
     });
 
     return { accessToken: fallbackAccessToken, refreshToken: null };
@@ -209,12 +212,14 @@ async refreshUserToken(refreshToken: string) {
     id: decoded.id,
     type: "customer",
     current_step: currentStep, 
+    mobile: decoded.mobile, 
   });
 
   const newRefreshToken = signRefreshToken({
     id: decoded.id,
     type: "customer",
     current_step: currentStep, 
+    mobile: decoded.mobile, 
   });
 
   await this.authRepository.createUserSession(decoded.id, newRefreshToken);
