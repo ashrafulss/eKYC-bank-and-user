@@ -3,8 +3,8 @@ import { nomineeService } from "./nominee.service.js";
 import { asyncHandler } from "../../../utils/asyncHandler.js";
 import { ApiResponse } from "../../../utils/ApiResponse.js";
 import { BadRequestError, UnauthorizedError } from "../../../utils/AppError.js";
+import { validateBase64Image } from "../../../utils/imageValidator.js";
 
-// 🌟 PHASE 2: Updates any alterations and flags registration profile step as finalized
 export const saveNominees = asyncHandler(async (req: Request, res: Response) => {
   const { nominees } = req.body;
 
@@ -38,8 +38,9 @@ export const saveNominees = asyncHandler(async (req: Request, res: Response) => 
   );
 });
 
-// 🌟 PHASE 1: Runs static parsing and saves initial structure directly to database tables
+
 export const verifyNomineeNIDCard = asyncHandler(async (req: Request, res: Response) => {
+
   const { frontImage, backImage } = req.body;
   const userId = req.customer?.id;
 
@@ -49,6 +50,9 @@ export const verifyNomineeNIDCard = asyncHandler(async (req: Request, res: Respo
   if (!userId) {
     throw new UnauthorizedError("Unauthorized session request context missing.");
   }
+
+  validateBase64Image(frontImage, "Front NID Image");
+  validateBase64Image(backImage, "Back NID Image");
 
   const savedRecord = await nomineeService.processOcrAndSaveInitial(userId, frontImage, backImage);
 
