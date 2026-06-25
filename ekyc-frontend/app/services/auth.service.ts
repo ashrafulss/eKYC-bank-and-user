@@ -11,6 +11,17 @@ export interface VerifyOtpPayload {
   mobile: string;
   otpCode: string;
 }
+export interface SendOtpData {
+  otpExpirySecond: number;
+  displayMessageEN: string;
+}
+
+// 2. Define the unified structure your standard API response returns
+export interface SendOtpResponse {
+  success: boolean;
+  message: string;
+  data: SendOtpData;
+}
 
 export interface CustomerData {
   id: string;
@@ -32,8 +43,9 @@ export interface RefreshTokenResponse {
 
 export const authService = {
 
-  sendOtp: async (payload: SendOtpPayload): Promise<void> => {
-    await apiClient.post("/auth/send-otp", payload);
+  sendOtp: async (payload: SendOtpPayload): Promise<SendOtpResponse> => {
+    const response = await apiClient.post<SendOtpResponse>("/auth/send-otp", payload);
+    return response.data; 
   },
 
   verifyOtp: async (payload: VerifyOtpPayload): Promise<VerifyOtpResponse> => {

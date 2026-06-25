@@ -15,15 +15,22 @@ export const sendOTP = asyncHandler(async (req: Request, res: Response) => {
 
   try {
     await authService.processOTPDelivery(mobile, email, method);
+    const OTP_LIFETIME_SECONDS = 180;
+    const displayMessageEN = `Verification code sent successfully via ${method.toUpperCase()}`;
+
+    return ApiResponse.ok(
+      res,
+      {
+        otpExpirySecond: OTP_LIFETIME_SECONDS,
+        displayMessageEN
+      },
+      displayMessageEN,
+    );
+
   } catch (error) {
     throw mapServiceError(error);
   }
 
-  ApiResponse.ok(
-    res,
-    undefined,
-    `Verification code dispatched successfully via ${method.toUpperCase()}`,
-  );
 });
 
 

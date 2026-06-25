@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useEffect, useCallback } from "react";
 
 
-const OTP_TIMER = 180;
+
 
 export default function MobileVerification() {
   const router = useRouter();
@@ -20,7 +20,7 @@ export default function MobileVerification() {
   const [modalError, setModalError] = useState("");
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(OTP_TIMER);
+  const [timeLeft, setTimeLeft] = useState(0);
   const [canResend, setCanResend] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -46,22 +46,22 @@ export default function MobileVerification() {
   };
 
 
-  const startTimer = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    setTimeLeft(OTP_TIMER);
-    setCanResend(false);
+const startTimer = useCallback((seconds: number) => {
+  if (timerRef.current) clearInterval(timerRef.current);
+  setTimeLeft(seconds);   // ← use passed value
+  setCanResend(false);
 
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current!);
-          setCanResend(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, []);
+  timerRef.current = setInterval(() => {
+    setTimeLeft((prev) => {
+      if (prev <= 1) {
+        clearInterval(timerRef.current!);
+        setCanResend(true);
+        return 0;
+      }
+      return prev - 1;
+    });
+  }, 1000);
+}, []);
 
   useEffect(() => {
     return () => {
@@ -98,43 +98,42 @@ const formatTimeOnlySecond = (seconds: number) => {
     setError("");
     setLoading(true);
 
-    try {
-      await authService.sendOtp({
-        mobile: `+880${mobile}`,
-        deliveryMethod: "both",
-      });
+     try {
+    const response = await authService.sendOtp({
+      mobile: `+880${mobile}`,
+      deliveryMethod: "both",
+    });
 
-      setOtp(["", "", "", "", "", ""]);
-      setModalError("");
-      setShowModal(true);
-      startTimer();
-    } catch (err: any) {
-      setError(err.message || "Failed to deliver OTP request. Please retry.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-   const handleResend = async () => {
-    if (!canResend) return;
-    setLoading(true);
+    setOtp(["", "", "", "", "", ""]);
     setModalError("");
-
-    try {
-      await authService.sendOtp({
-        mobile: `+880${mobile}`,
-        deliveryMethod: "both",
-      });
-      setOtp(["", "", "", "", "", ""]);
-      setTimeout(() => inputsRef.current[0]?.focus(), 100);
-      startTimer();
-    } catch (err: any) {
-      setModalError(err.message || "Resend request failed.");
-    } finally {
-      setLoading(false);
-    }
+    setShowModal(true);
+    startTimer(response.data.otpExpirySecond);  // ← call startTimer with seconds
+  } catch (err: any) {
+    setError(err.message || "Failed to deliver OTP request. Please retry.");
+  } finally {
+    setLoading(false);
+  }
   };
 
+const handleResend = async () => {
+  if (!canResend) return;
+  setLoading(true);
+  setModalError("");
+
+  try {
+    const response = await authService.sendOtp({
+      mobile: `+880${mobile}`,
+      deliveryMethod: "both",
+    });
+    setOtp(["", "", "", "", "", ""]);
+    setTimeout(() => inputsRef.current[0]?.focus(), 100);
+    startTimer(response.data.otpExpirySecond);  // ← use dynamic value here too
+  } catch (err: any) {
+    setModalError(err.message || "Resend request failed.");
+  } finally {
+    setLoading(false);
+  }
+};
   const handleOtpChange = (value: string, index: number) => {
     if (!/^\d?$/.test(value)) return;
     setModalError("");
