@@ -26,4 +26,11 @@ export const selfieApiService = {
       currentStep:    data.currentStep,
     };
   },
+
+
+  async confirmSelfieStep() {
+    const res = await apiClient.post("/auth/confirm-selfie-step");
+    const data = res.data.data;
+    return data;
+  }
 };

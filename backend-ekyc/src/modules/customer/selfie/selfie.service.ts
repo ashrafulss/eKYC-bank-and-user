@@ -102,6 +102,8 @@ async function callFaceMatchML(
 
 // ── Main service ──────────────────────────────────────────────────────────────
 export const selfieService = {
+
+
   async processSelfie(userId: string, selfieBase64: string) {
     try {
       const selfieFile = await saveSelfieImage(selfieBase64, userId);
@@ -141,18 +143,8 @@ export const selfieService = {
           client,
         );
 
-        if (overallPass) {
-          await client.query(
-            `UPDATE public.users
-             SET current_step = 'selfie_verified'::public.registration_step,
-                 updated_at = NOW()
-             WHERE id = $1`,
-            [userId],
-          );
-        }
 
         return {
-          currentStep:    overallPass ? "selfie_verified" : "selfie_failed",
           livenessScore:  mlResult.livenessScore,
           livenessPass:   mlResult.livenessPass,
           faceMatchScore: mlResult.matchScore,
@@ -165,4 +157,19 @@ export const selfieService = {
       throw err;
     }
   },
+
+
+
+  async completeSelfieStep(userId: string) {
+    return await withTransaction(async (client) => {
+      await client.query(
+        `UPDATE public.users
+         SET current_step = 'selfie_verified'::public.registration_step,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [userId],
+      );
+      return { currentStep: "selfie_verified" };
+    });
+  }
 };
