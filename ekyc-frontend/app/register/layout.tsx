@@ -90,7 +90,7 @@ export default function RegisterLayout({ children }: { children: React.ReactNode
     "basic-informations": 4,
     "nominee-bo": 5,
     review: 6,
-    submitted: 7,
+    // submitted: 7,
   };
 
   const currentRouteName = pathname.split("/register/")[1]?.split("/")[0] || "";
@@ -104,7 +104,7 @@ export default function RegisterLayout({ children }: { children: React.ReactNode
     { num: 4, title: "Basic Info", subtitle: "Personal details" },
     { num: 5, title: "Nominee",    subtitle: "Beneficiary setup" },
     { num: 6, title: "Review",     subtitle: "Confirm details" },
-    { num: 7, title: "Submitted",  subtitle: "Complete" },
+    // { num: 7, title: "Submitted",  subtitle: "Complete" },
   ];
 
   const completionPct = Math.round(((currentStep - 1) / 6) * 100);
@@ -139,7 +139,7 @@ export default function RegisterLayout({ children }: { children: React.ReactNode
                       ) : step.num}
                     </div>
 
-                    {step.num < 7 && (
+                    {step.num < 6 && (
                       <AnimatedLine
                         done={done}
                         delay={(step.num - 1) * 200}
