@@ -292,18 +292,22 @@ export default function LivenessSelfie({ onComplete, onContinue }: Props) {
 
             const nextIdx = localChallengeIdx + 1;
 
-            if (nextIdx >= CHALLENGES.length) {
-              // All challenges passed — capture selfie
-              stopCamera();
-              const cap = canvasRef.current!;
-              cap.width  = W;
-              cap.height = H;
-              cap.getContext("2d")!.drawImage(videoRef.current!, 0, 0);
-              setSelfieUrl(cap.toDataURL("image/jpeg", 0.92));
-              setPhase("analyzing");
-              runAnalysis(cap);
-              return;
-            }
+        if (nextIdx >= CHALLENGES.length) {
+
+  const cap = canvasRef.current!;
+  cap.width  = W;
+  cap.height = H;
+  cap.getContext("2d")!.drawImage(videoRef.current!, 0, 0);
+  const url = cap.toDataURL("image/jpeg", 0.92);
+
+
+  stopCamera();
+
+  setSelfieUrl(url);
+  setPhase("analyzing");
+  runAnalysis(cap);
+  return;
+}
 
             localChallengeIdx = nextIdx;
             setChallengeIdx(nextIdx);
