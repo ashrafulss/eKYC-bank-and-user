@@ -3,15 +3,20 @@ import apiClient from "@/lib/api-client";
 
 export interface ReviewApplicationData {
   personal: {
-    applicationId?: string;       // 🌟 Added to track references safely
+    applicationId?: string;     
     fullNameEnglish: string;
     fullNameBangla: string;
-    fatherNameBangla: string;     // 🌟 Added
-    motherNameBangla: string;     // 🌟 Added
+    fatherNameBangla: string;     
+    motherNameBangla: string;     
     dob: string;
     gender: string;
     nidNumber: string;
-    mobile: string;
+    dateOfBirth: string;
+    spouseName: string;
+    bloodGroup: string;
+    birthPlace: string;
+    postCode: string;
+    phoneNumber: string;
     presentAddress: string;
     email: string;
     occupation: string;

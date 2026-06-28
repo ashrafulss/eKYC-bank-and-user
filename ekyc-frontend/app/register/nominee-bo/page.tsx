@@ -3,26 +3,7 @@
 import { nomineeService } from "@/app/services/nominee.service";
 import { useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
-
-
-// ── VALIDATION CONFIG ──────────────────────────────────────────
-const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];
-const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
-const MIN_SIZE_BYTES = 50 * 1024; // 50KB
-
-function validateImageFile(file: File): string | null {
-  if (!ALLOWED_TYPES.includes(file.type))
-    return `Invalid file type. Only ${ALLOWED_EXTENSIONS.join(", ")} are allowed.`;
-  const ext = "." + file.name.split(".").pop()?.toLowerCase();
-  if (!ALLOWED_EXTENSIONS.includes(ext))
-    return `Invalid extension. Only ${ALLOWED_EXTENSIONS.join(", ")} are allowed.`;
-  if (file.size > MAX_SIZE_BYTES)
-    return "File too large. Maximum size is 10MB.";
-  if (file.size < MIN_SIZE_BYTES)
-    return "Image too small. Please upload a clear photo.";
-  return null;
-}
+import { validateImageFile } from "@/app/utils/imageValidator";
 
 // ── TYPES ──────────────────────────────────────────────────────
 interface Nominee {
@@ -147,14 +128,19 @@ export default function NomineeBo() {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
+
+    // 🌟 Central validation utility intercept layer
     const err = validateImageFile(file);
     if (err) {
       updateNominee(
         index,
-        side === "front" ? { frontError: err } : { backError: err },
+        side === "front" 
+          ? { frontError: err, frontImage: null } 
+          : { backError: err, backImage: null },
       );
       return;
     }
+
     const url = URL.createObjectURL(file);
     updateNominee(
       index,
@@ -169,10 +155,16 @@ export default function NomineeBo() {
     setActiveCamera({ nomineeIndex, side });
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+        video: { facingMode: "environment", width: 1280, height: 720 },
       });
       if (videoRef.current) videoRef.current.srcObject = stream;
     } catch {
+      updateNominee(
+        nomineeIndex,
+        side === "front" 
+          ? { frontError: "Could not access video input capture streams." } 
+          : { backError: "Could not access video input capture streams." }
+      );
       setActiveCamera(null);
     }
   };
@@ -184,18 +176,38 @@ export default function NomineeBo() {
     if (!video || !canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0);
-    const imageData = canvas.toDataURL("image/png");
+
     const { nomineeIndex, side } = activeCamera;
-    updateNominee(
-      nomineeIndex,
-      side === "front"
-        ? { frontImage: imageData, frontError: null }
-        : { backImage: imageData, backError: null },
-    );
-    stopCamera();
+
+                           
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+
+      const file = new File([blob], `nominee_${nomineeIndex}_${side}.jpg`, { type: "image/jpeg" });
+      const err = validateImageFile(file);
+
+      if (err) {
+        updateNominee(
+          nomineeIndex,
+          side === "front" ? { frontError: err } : { backError: err }
+        );
+        stopCamera();
+        return;
+      }
+
+      const url = URL.createObjectURL(file);
+      updateNominee(
+        nomineeIndex,
+        side === "front"
+          ? { frontImage: url, frontError: null }
+          : { backImage: url, backError: null },
+      );
+      stopCamera();
+    }, "image/jpeg", 0.90);
   };
 
   const stopCamera = () => {
@@ -206,7 +218,7 @@ export default function NomineeBo() {
     setActiveCamera(null);
   };
 
-  // ── 🌟 LIVE WORKFLOW: VERIFY INDIVIDUAL NOMINEE NID ──────────
+  // ── LIVE WORKFLOW: VERIFY INDIVIDUAL NOMINEE NID ──────────
   const handleVerifyNomineeNID = async (index: number) => {
     const current = nominees[index];
     if (!current.frontImage || !current.backImage) {
@@ -224,11 +236,9 @@ export default function NomineeBo() {
       const base64Front = await convertBlobUrlToBase64(current.frontImage);
       const base64Back = await convertBlobUrlToBase64(current.backImage);
 
-      // Call verification service targeting nominee records specifically
       const response = await nomineeService.verifyNomineeNID(base64Front, base64Back);
       const data = response.data || {};
 
-      // Hydrate nominee details dynamically from your engine payload
       updateNominee(index, {
         name: data.name || "Anika Chowdhury",
         relationship: data.relationship || "Spouse",
@@ -238,13 +248,13 @@ export default function NomineeBo() {
         share: current.share || "100",
       });
     } catch (err: any) {
-      updateNominee(index, { frontError: err.message || "Failed to extract NID parameters safely." });
+      updateNominee(index, { frontError: err.response?.data?.message || err.message || "Failed to extract NID parameters safely." });
     } finally {
       updateNominee(index, { isVerifyingNID: false });
     }
   };
 
-  // ── 🌟 COMPOSITE MODULE SUBMISSION ───────────────────────────
+  // ── COMPOSITE MODULE SUBMISSION ───────────────────────────
   const handleFormSubmission = async () => {
     setGlobalError(null);
     setIsSubmitting(true);
@@ -274,14 +284,12 @@ export default function NomineeBo() {
         })
       );
 
-      // 1. Save multi-nominee structural parameters
       await nomineeService.submitNominees(transformedNominees);
       
-      // 2. FIXED KEY MAPPING: Send accurate keys expected by Express validator schemas
       await nomineeService.saveBoPreferences({
         accountType: boPrefs.accountType,
-        depositoryParticipant: boPrefs.dp,   // Maps 'dp' state to 'depositoryParticipant' API payload
-        bankName: boPrefs.bank,              // Maps 'bank' state to 'bankName' API payload
+        depositoryParticipant: boPrefs.dp,   
+        bankName: boPrefs.bank,              
         settlementAccount: boPrefs.settlementAccount,
         tinNumber: boPrefs.tin,
         permissionCash: permissions.cash,
@@ -291,7 +299,7 @@ export default function NomineeBo() {
 
       router.push("/register/review");
     } catch (err: any) {
-      setGlobalError(err.message || "An unexpected configuration error occurred during serialization pipelines.");
+      setGlobalError(err.response?.data?.message || err.message || "An unexpected configuration error occurred during serialization pipelines.");
     } finally {
       setIsSubmitting(false);
     }
@@ -312,24 +320,24 @@ export default function NomineeBo() {
           </div>
         )}
 
-        {/* Camera Modal component */}
         {activeCamera && (
-          <div className="fixed inset-0 bg-black/70 flex flex-col items-center justify-center z-50">
-            <video ref={videoRef} autoPlay className="w-[500px] rounded-lg border-4 border-white" />
-            <canvas ref={canvasRef} className="hidden" />
-            <div className="flex gap-4 mt-4">
-              <button onClick={takePhoto} className="bg-green-600 text-white px-6 py-2 rounded-lg font-medium">
-                📸 Take Photo
-              </button>
-              <button onClick={stopCamera} className="bg-red-600 text-white px-6 py-2 rounded-lg font-medium">
-                ✕ Close
-              </button>
+          <div className="fixed inset-0 bg-black/70 flex flex-col items-center justify-center z-50 p-4">
+            <div className="relative w-full max-w-lg bg-slate-950 rounded-xl overflow-hidden shadow-2xl flex flex-col items-center">
+              <video ref={videoRef} autoPlay playsInline muted className="w-full aspect-[4/3] object-cover bg-black" />
+              <canvas ref={canvasRef} className="hidden" />
+              <div className="flex gap-4 my-4">
+                <button onClick={takePhoto} className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors cursor-pointer">
+                  📸 Take Photo
+                </button>
+                <button onClick={stopCamera} className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium transition-colors cursor-pointer">
+                  ✕ Close
+                </button>
+              </div>
             </div>
           </div>
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-          {/* NOMINEES WIZARD CONTAINER */}
           <div className="space-y-6 lg:col-span-2">
             {nominees.map((nominee, index) => (
               <div key={index} className="bg-white rounded-xl shadow-xs border border-gray-100 overflow-hidden">
@@ -341,7 +349,7 @@ export default function NomineeBo() {
                     <button
                       type="button"
                       onClick={() => removeNominee(index)}
-                      className="text-xs font-semibold text-red-500 hover:text-red-700 transition-colors"
+                      className="text-xs font-semibold text-red-500 hover:text-red-700 transition-colors cursor-pointer"
                     >
                       Remove
                     </button>
@@ -356,7 +364,7 @@ export default function NomineeBo() {
                     <button
                       type="button"
                       onClick={() => toggleSkip(index)}
-                      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border transition-all ${
+                      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border transition-all cursor-pointer ${
                         nominee.nidSkipped
                           ? "bg-blue-50 border-blue-300 text-blue-600"
                           : "bg-slate-50 border-slate-200 text-slate-500 hover:text-amber-600"
@@ -375,14 +383,14 @@ export default function NomineeBo() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <input
                           type="file"
-                          accept={ALLOWED_TYPES.join(",")}
+                          accept=".jpg,.jpeg,.png,.webp,image/*"
                           className="hidden"
                           ref={(el) => { frontInputRefs.current[index] = el; }}
                           onChange={(e) => handleFileChange(e, index, "front")}
                         />
                         <input
                           type="file"
-                          accept={ALLOWED_TYPES.join(",")}
+                          accept=".jpg,.jpeg,.png,.webp,image/*"
                           className="hidden"
                           ref={(el) => { backInputRefs.current[index] = el; }}
                           onChange={(e) => handleFileChange(e, index, "back")}
@@ -412,7 +420,7 @@ export default function NomineeBo() {
                           type="button"
                           disabled={nominee.isVerifyingNID}
                           onClick={() => handleVerifyNomineeNID(index)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-xs font-semibold shadow-xs disabled:opacity-50"
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-xs font-semibold shadow-xs disabled:opacity-50 transition-colors cursor-pointer"
                         >
                           {nominee.isVerifyingNID ? "Verifying Cards..." : "Verify & Load Information"}
                         </button>
@@ -446,12 +454,11 @@ export default function NomineeBo() {
               </div>
             ))}
 
-            <button type="button" onClick={addNominee} className="text-sm font-semibold text-cyan-600 hover:text-cyan-700 pl-2">
+            <button type="button" onClick={addNominee} className="text-sm font-semibold text-cyan-600 hover:text-cyan-700 pl-2 cursor-pointer">
               + Add another nominee
             </button>
           </div>
 
-          {/* BO PREFERENCES FORM COMPONENT CARD */}
           <div className="bg-white rounded-xl shadow-xs border border-gray-100 p-6 md:p-8 space-y-6 lg:sticky lg:top-6">
             <h2 className="text-xs font-bold tracking-wider text-cyan-700 uppercase border-b border-gray-100 pb-2">
               BO Account Preferences
@@ -487,7 +494,7 @@ export default function NomineeBo() {
                       key={perm}
                       type="button"
                       onClick={() => setPermissions({ ...permissions, [perm]: !permissions[perm] })}
-                      className={`px-3 py-1.5 rounded-md text-xs font-semibold capitalize transition-all ${
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold capitalize transition-all cursor-pointer ${
                         permissions[perm] ? "bg-cyan-700 text-white" : "bg-slate-100 text-slate-500"
                       }`}
                     >
@@ -500,19 +507,11 @@ export default function NomineeBo() {
           </div>
         </div>
 
-        {/* Footer Navigation Section */}
         <div className="w-full mt-8 flex justify-end items-center border-t border-gray-200 pt-6">
-          {/* <button
-            onClick={() => router.back()}
-            disabled={isSubmitting}
-            className="bg-gray-500 text-white px-8 py-3 rounded text-sm font-medium disabled:opacity-50"
-          >
-            Back
-          </button> */}
           <button
             onClick={handleFormSubmission}
             disabled={isSubmitting}
-            className="px-10 py-3 rounded text-white font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+            className="px-10 py-3 rounded text-white font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer"
           >
             {isSubmitting ? "Saving Config..." : "Next"}
           </button>
@@ -535,7 +534,7 @@ interface NIDMiniCardProps {
 
 function NIDMiniCard({ label, isRequired, image, error, onRemove, onBrowse, onCapture }: NIDMiniCardProps) {
   return (
-    <div className={`flex-1 bg-white border-2 border-dashed p-6 text-center rounded-xl ${error ? "border-red-300" : image ? "border-green-300" : "border-slate-200"}`}>
+    <div className={`flex-1 bg-white border-2 border-dashed p-6 text-center rounded-xl transition-all ${error ? "border-red-300 bg-red-50/10" : image ? "border-green-300 bg-emerald-50/5" : "border-slate-200"}`}>
       <p className="font-bold mb-3 text-sm text-slate-800">
         {label} {isRequired && <span className="text-red-500 font-bold">*</span>}
       </p>
@@ -543,16 +542,20 @@ function NIDMiniCard({ label, isRequired, image, error, onRemove, onBrowse, onCa
         {image ? (
           <div className="relative h-full">
             <img src={image} className="h-full object-contain rounded" alt={label} />
-            <button type="button" onClick={onRemove} className="absolute -top-2 -right-2 bg-red-600 text-white w-5 h-5 rounded-full text-xs">✕</button>
+            <button type="button" onClick={onRemove} className="absolute -top-2 -right-2 bg-red-600 text-white w-5 h-5 rounded-full text-xs flex items-center justify-center transition-colors hover:bg-red-700 cursor-pointer">✕</button>
           </div>
         ) : (
           <span className="text-xs text-gray-400">No identity image selected</span>
         )}
       </div>
-      {error && <p className="text-red-600 text-xs mb-2 text-left">{error}</p>}
+      {error && (
+        <div className="flex items-start gap-1 text-left bg-red-50 border border-red-200 rounded p-2 mb-2">
+          <p className="text-red-600 text-xs leading-tight">{error}</p>
+        </div>
+      )}
       <div className="flex gap-2 justify-center">
-        <button type="button" onClick={onBrowse} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium">Browse</button>
-        <button type="button" onClick={onCapture} className="bg-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium">Capture</button>
+        <button type="button" onClick={onBrowse} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer">Browse</button>
+        <button type="button" onClick={onCapture} className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer">Capture</button>
       </div>
     </div>
   );

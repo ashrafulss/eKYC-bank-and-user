@@ -3,6 +3,7 @@ import { nidService } from "./nid.service.js";
 import { asyncHandler } from "../../../utils/asyncHandler.js";
 import { ApiResponse } from "../../../utils/ApiResponse.js";
 import { BadRequestError, UnauthorizedError } from "../../../utils/AppError.js";
+import { validateBase64Image } from "../../../utils/imageValidator.js";
 
 export const uploadNID = asyncHandler(async (req: Request, res: Response) => {
   // 1. Auth check FIRST
@@ -25,7 +26,9 @@ export const uploadNID = asyncHandler(async (req: Request, res: Response) => {
     throw new BadRequestError("Back NID image is required.");
   }
 
-  // 3. Pass mobile from JWT into service
+  validateBase64Image(frontImage, "Front NID Image");
+  validateBase64Image(backImage, "Back NID Image");
+
   const result = await nidService.processNIDUploads(userId, frontImage, backImage, mobile);
 
   const isProduction = process.env.NODE_ENV === "production";

@@ -4,27 +4,7 @@ import { nidService } from "@/app/services/nid.service";
 import { useRouter } from "next/navigation";
 import React, { useRef, useState } from "react";
 import { useAuth } from "@/app/context/auth-context";
-
-const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];
-const MAX_SIZE_MB = 5;
-const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
-
-function validateImageFile(file: File): string | null {
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    return `Invalid file type. Only ${ALLOWED_EXTENSIONS.join(", ")} are allowed.`;
-  }
-  const ext = "." + file.name.split(".").pop()?.toLowerCase();
-  if (!ALLOWED_EXTENSIONS.includes(ext)) {
-    return `Invalid extension. Only ${ALLOWED_EXTENSIONS.join(", ")} are allowed.`;
-  }
-
-  if (file.size > MAX_SIZE_BYTES) {
-    return `File too large. Maximum size is ${MAX_SIZE_MB}MB.`;
-  }
-
-  return null;
-}
+import { validateImageFile } from "@/app/utils/imageValidator";
 
 export default function NIDVerification() {
   const router = useRouter();
@@ -47,10 +27,8 @@ export default function NIDVerification() {
   const [frontError, setFrontError] = useState<string | null>(null);
   const [backError, setBackError] = useState<string | null>(null);
 
-
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
-
   const [activeCamera, setActiveCamera] = useState<"front" | "back" | null>(null);
 
   const removeFrontImage = () => {
@@ -71,7 +49,6 @@ export default function NIDVerification() {
     backInputRef.current?.click();
   };
 
-
   const convertFileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -86,9 +63,11 @@ export default function NIDVerification() {
     e.target.value = "";
     if (!file) return;
 
+
     const err = validateImageFile(file);
     if (err) {
       setFrontError(err);
+      setFrontImage(null);
       return;
     }
 
@@ -109,12 +88,12 @@ export default function NIDVerification() {
     const err = validateImageFile(file);
     if (err) {
       setBackError(err);
+      setBackImage(null);
       return;
     }
 
     try {
       setBackError(null);
-
       const base64Str = await convertFileToBase64(file);
       setBackImage(base64Str);
     } catch (err) {
@@ -125,10 +104,14 @@ export default function NIDVerification() {
   const startCamera = async (side: "front" | "back") => {
     setActiveCamera(side);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: "environment", width: 1280, height: 720 } 
+      });
       if (videoRef.current) videoRef.current.srcObject = stream;
     } catch (err) {
       console.error("Camera access denied or unavailable", err);
+      if (side === "front") setFrontError("Could not access camera device.");
+      else setBackError("Could not access camera device.");
       setActiveCamera(null);
     }
   };
@@ -145,11 +128,33 @@ export default function NIDVerification() {
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0);
 
-    const imageData = canvas.toDataURL("image/png");
-    if (activeCamera === "front") setFrontImage(imageData);
-    else if (activeCamera === "back") setBackImage(imageData);
+    
+    canvas.toBlob((blob) => {
+      if (!blob) return;
 
-    stopCamera();
+      const file = new File([blob], `captured_${activeCamera}.jpg`, { type: "image/jpeg" });
+      const err = validateImageFile(file);
+
+      if (err) {
+        if (activeCamera === "front") setFrontError(err);
+        else setBackError(err);
+        stopCamera();
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (activeCamera === "front") {
+          setFrontError(null);
+          setFrontImage(reader.result as string);
+        } else {
+          setBackError(null);
+          setBackImage(reader.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+      stopCamera();
+    }, "image/jpeg", 0.90);
   };
 
   const stopCamera = () => {
@@ -160,7 +165,6 @@ export default function NIDVerification() {
   };
 
   const canProceed = !!frontImage && !!backImage && !isSubmitting;
-
 
   const handleSubmit = async () => {
     if (!frontImage || !backImage) return;
@@ -177,9 +181,14 @@ export default function NIDVerification() {
       router.push("/register/selfie");
     } catch (err: any) {
       console.error("❌ Submission failed:", err);
-      setGlobalError(
-        err.response?.data?.message || err.message || "Something went wrong while saving your documents. Please try again."
-      );
+      const serverMessage = err.response?.data?.message || err.message || "";
+      
+     
+      if (serverMessage.toLowerCase().includes("nid") || serverMessage.toLowerCase().includes("document")) {
+        setGlobalError("The uploaded files are not recognized as valid National ID layouts. Please ensure they are flat and readable.");
+      } else {
+        setGlobalError(serverMessage || "Something went wrong while saving your documents. Please try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -198,42 +207,47 @@ export default function NIDVerification() {
         )}
       </div>
 
+
       <input
         type="file"
         ref={frontInputRef}
         onChange={handleFrontChange}
-        accept={ALLOWED_TYPES.join(",")}
+        accept=".jpg,.jpeg,.png,.webp,image/*"
         className="hidden"
       />
       <input
         type="file"
         ref={backInputRef}
         onChange={handleBackChange}
-        accept={ALLOWED_TYPES.join(",")}
+        accept=".jpg,.jpeg,.png,.webp,image/*"
         className="hidden"
       />
 
       {activeCamera && (
-        <div className="fixed inset-0 bg-black/70 flex flex-col items-center justify-center z-50">
-          <video
-            ref={videoRef}
-            autoPlay
-            className="w-[500px] rounded-lg border-4 border-white"
-          />
-          <canvas ref={canvasRef} className="hidden" />
-          <div className="flex gap-4 mt-4">
-            <button
-              onClick={takePhoto}
-              className="bg-green-600 text-white px-6 py-2 rounded-lg cursor-pointer"
-            >
-              📸 Take Photo
-            </button>
-            <button
-              onClick={stopCamera}
-              className="bg-red-600 text-white px-6 py-2 rounded-lg cursor-pointer"
-            >
-              ✕ Close
-            </button>
+        <div className="fixed inset-0 bg-black/70 flex flex-col items-center justify-center z-50 p-4">
+          <div className="relative w-full max-w-lg bg-slate-950 rounded-xl overflow-hidden shadow-2xl flex flex-col items-center">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full aspect-[4/3] object-cover bg-black"
+            />
+            <canvas ref={canvasRef} className="hidden" />
+            <div className="flex gap-4 my-4">
+              <button
+                onClick={takePhoto}
+                className="bg-green-600 hover:bg-green-700 text-white font-medium px-6 py-2 rounded-lg cursor-pointer transition-colors"
+              >
+                📸 Take Photo
+              </button>
+              <button
+                onClick={stopCamera}
+                className="bg-red-600 hover:bg-red-700 text-white font-medium px-6 py-2 rounded-lg cursor-pointer transition-colors"
+              >
+                ✕ Close
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -259,26 +273,16 @@ export default function NIDVerification() {
       </div>
 
       <div className="w-full flex flex-col sm:flex-row justify-end gap-4 border-t border-slate-200/60 mt-10 pt-6 pb-24">
-        {/* <button
-        hidden
-          onClick={() => router.back()}
-          disabled={isSubmitting}
-          className="bg-gray-500 text-white px-8 py-3 rounded cursor-pointer transition-colors hover:bg-gray-600 disabled:opacity-50"
-        >
-          Back
-        </button> */}
-
         <div className="flex flex-col items-end gap-2 w-full sm:w-auto">
           <button
             disabled={!canProceed}
             onClick={handleSubmit}
             className={`px-10 py-3 rounded text-white font-semibold transition-all ${
               canProceed
-                ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 cursor-pointer active:scale-[0.98]"
+                ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md cursor-pointer active:scale-[0.98]"
                 : "bg-gray-200 text-gray-400 shadow-none cursor-not-allowed"
             }`}
           >
-            {/* 🌟 LOADING TEXT CONTEXT ACCORDING TO SYSTEM STATE */}
             {isSubmitting ? "Uploading NID..." : "Next"}
           </button>
         </div>
@@ -286,7 +290,6 @@ export default function NIDVerification() {
     </div>
   );
 }
-
 
 type NIDCardProps = {
   label: string;
@@ -330,6 +333,7 @@ function NIDCard({
               alt={label}
             />
             <button
+              type="button"
               onClick={onRemove}
               className="absolute -top-2 -right-2 bg-red-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm cursor-pointer hover:bg-red-700 transition-colors shadow-sm"
             >
@@ -387,7 +391,7 @@ function NIDCard({
 
       {!image && !error && (
         <p className="text-xs text-gray-400 mt-3">
-          JPG · JPEG · PNG · WEBP · max 5MB
+          JPG · JPEG · PNG · WEBP · max 10MB
         </p>
       )}
     </div>
