@@ -8,7 +8,7 @@ const STEP_ROUTE_MAP: Record<string, string> = {
   "phone_number_verified": "/register/nid-verification",
   "nid_verified":           "/register/selfie",
   "selfie_verified":        "/register/basic-informations",
-  "basic_info_done":        "/register/nominee-bo",
+  "basic_info_done":        "/register/nominee",
   "nominee_done":           "/register/review",
   "review_done":            "/register/submitted",
   "submitted":              "/profile", 

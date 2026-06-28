@@ -34,7 +34,7 @@ export default function MobileVerification() {
       case "selfie_verified":
         return "/register/basic-informations";
       case "basic_info_done":
-        return "/register/nominee-bo";
+        return "/register/nominee";
       case "nominee_done":
         return "/register/review";
       case "review_done":

@@ -72,7 +72,7 @@ export default function BasicInformations() {
       setErrorMessage(null);
       
       await basicInformationService.updateBasicInformations(formData);
-      router.push("/register/nominee-bo");
+      router.push("/register/nominee");
     } catch (error: any) {
       console.error("Failed to persist basic info amendments:", error);
       setErrorMessage(error.message || "Something went wrong while preserving updates.");

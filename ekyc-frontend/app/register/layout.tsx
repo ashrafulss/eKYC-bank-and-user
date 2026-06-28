@@ -88,7 +88,7 @@ export default function RegisterLayout({ children }: { children: React.ReactNode
     "nid-verification": 2,
     selfie: 3,
     "basic-informations": 4,
-    "nominee-bo": 5,
+    "nominee": 5,
     review: 6,
     // submitted: 7,
   };
