@@ -6,25 +6,39 @@ export interface SelfieVerificationResult {
   faceMatchScore: number | null;
   faceMatchPass:  boolean | null;
   overallPass:    boolean;
-  currentStep:    string;
+  capturedImage:  string;
+  currentStep?:   string;
 }
 
 export const selfieApiService = {
-  async verifySelfie(selfieBase64: string): Promise<SelfieVerificationResult> {
-    const res = await apiClient.post("/auth/verify-selfie", {
-      selfieImage: selfieBase64,
-    });
 
-    const data = res.data.data;
+  async verifyLiveness(
+    videoBlob: Blob,
+    referenceId: string,
+    mobileNumber: string,
+    actions: string[] = ["UP", "DOWN", "LEFT", "RIGHT"],
+  ) {
+    const form = new FormData();
+    form.append("video",         videoBlob, "liveness.mp4");
+    form.append("reference_id",  referenceId);
+    form.append("mobile_number", mobileNumber);
+    form.append("actions",       JSON.stringify({ actions }));
+
+    const res = await apiClient.post("/auth/verify-liveness", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    
+    const responseData = res.data;
+    const body = responseData.body || {};
 
     return {
-      livenessScore:  data.livenessScore,
-      livenessPass:   data.livenessPass,
-      faceMatchScore: data.faceMatchScore ?? null,
-      faceMatchPass:  data.faceMatchPass  ?? null,
-      overallPass:    data.overallPass,
-      currentStep:    data.currentStep,
-    };
+      livenessScore:  body.livenessCheck ? 92 : 40,
+      livenessPass:   !!body.livenessCheck,
+      faceMatchScore: null,
+      faceMatchPass:  null,
+      overallPass:    !!body.livenessCheck,
+      capturedImage:  body.image || "",
+    } as SelfieVerificationResult;
   },
 
 
