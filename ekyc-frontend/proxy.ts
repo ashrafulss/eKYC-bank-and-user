@@ -31,7 +31,7 @@ export async function proxy(request: NextRequest) {
 
   if (sessionToken) {
     try {
-      const backendResponse = await fetch("http://localhost:5000/api/v1/auth/me", {
+      const backendResponse = await fetch("http://ekyc_backend_api:5000/api/v1/auth/me", {
         headers: {
           "Authorization": `Bearer ${sessionToken}`,
           "Cookie": `next_auth_session=${sessionToken}`
