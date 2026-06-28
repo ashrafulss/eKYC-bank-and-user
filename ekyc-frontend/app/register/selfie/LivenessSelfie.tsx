@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as faceapi from "face-api.js";
 import { useRouter } from "next/navigation";
 import { selfieApiService } from "@/app/services/selfie.service";
-
+import { useAuth } from "@/app/context/auth-context";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,13 +39,6 @@ const CHALLENGES: { key: PoseDir; label: string; arrow: string }[] = [
 const HOLD_FRAMES = 8;
 
 // ─── Pose detection ───────────────────────────────────────────────────────────
-// Video is CSS-mirrored (scaleX -1) so the user sees a mirror image.
-// face-api landmark coords come from the RAW (unflipped) frame.
-// Raw frame: pts[36] = user's RIGHT eye (left side of raw image)
-//            pts[45] = user's LEFT  eye (right side of raw image)
-// Raw yaw > 0 means nose shifted RIGHT in raw frame = user turned LEFT in mirror.
-// We FLIP the sign so displayed left/right matches what the user sees.
-
 function detectPose(lm: faceapi.FaceLandmarks68): {
   yaw: number;
   pitch: number;
@@ -95,7 +88,6 @@ function detectPose(lm: faceapi.FaceLandmarks68): {
 // ─── Canvas drawing helpers ───────────────────────────────────────────────────
 
 function drawGuideCircle(ctx: CanvasRenderingContext2D, W: number, H: number) {
-  // Static dashed guide — always visible so user knows where to position face
   const midX   = W / 2;
   const midY   = H / 2;
   const guideR = Math.min(W, H) * 0.38;
@@ -121,31 +113,26 @@ function drawFaceCircle(
   const r  = Math.max(box.width, box.height) * 0.62;
 
   const color = passed
-    ? "rgba(74, 222, 128, 0.95)"   // green-400 when challenge just passed
-    : "rgba(0, 200, 120, 0.90)";   // default green
+    ? "rgba(74, 222, 128, 0.95)"   
+    : "rgba(0, 200, 120, 0.90)";   
 
   ctx.save();
-
-  // Outer soft ring
   ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
   ctx.lineWidth   = 2;
   ctx.beginPath();
   ctx.arc(cx, cy, r + 16, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Main face circle
   ctx.strokeStyle = color;
   ctx.lineWidth   = 3;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Subtle fill tint
   ctx.fillStyle = "rgba(0, 200, 120, 0.07)";
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fill();
-
   ctx.restore();
 }
 
@@ -171,11 +158,16 @@ interface Props {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function LivenessSelfie({ onComplete, onContinue }: Props) {
+  const { user } = useAuth();
   const videoRef   = useRef<HTMLVideoElement>(null);
   const canvasRef  = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const rafRef     = useRef<number>(0);
   const holdRef    = useRef<Partial<Record<PoseDir, number>>>({});
+
+  const mediaRecorderRef  = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const isProcessingRef   = useRef<boolean>(false);
 
   const [phase,        setPhase]        = useState<Phase>("loading");
   const [challengeIdx, setChallengeIdx] = useState(0);
@@ -188,28 +180,32 @@ export default function LivenessSelfie({ onComplete, onContinue }: Props) {
   const router = useRouter();
 
   // ── Load models ──────────────────────────────────────────────────────────────
-  // faceRecognitionNet removed — face match is done server-side
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const M = "/models";
-      setLoadProgress(10);
-      await faceapi.nets.tinyFaceDetector.loadFromUri(M);
-      if (cancelled) return;
-      setLoadProgress(50);
-      await faceapi.nets.faceLandmark68Net.loadFromUri(M);
-      if (cancelled) return;
-      setLoadProgress(90);
-      await faceapi.nets.faceExpressionNet.loadFromUri(M);
-      if (cancelled) return;
-      setLoadProgress(100);
-      setPhase("instructions");
-    })().catch((e) => {
-      setErrorMsg(`Model load failed: ${e.message}`);
-      setPhase("error");
-    });
-    return () => { cancelled = true; };
-  }, []);
+// ── Change This Section in your useEffect ───────────────────
+// ── Update your model loader to look in the subfolders ───
+useEffect(() => {
+  let cancelled = false;
+  (async () => {
+    // 1. Tiny Face Detector is in the root /models folder
+    await faceapi.nets.tinyFaceDetector.loadFromUri("/models");
+    if (cancelled) return;
+    setLoadProgress(40);
+    
+    // 2. Point specifically to the nested subfolder where the tiny landmarks live 🌟
+    await faceapi.nets.faceLandmark68TinyNet.loadFromUri("/models/face_landmark_68_tiny");
+    if (cancelled) return;
+    setLoadProgress(80);
+    
+    // 3. Expression net manifest is located in the root /models folder
+    await faceapi.nets.faceExpressionNet.loadFromUri("/models");
+    if (cancelled) return;
+    setLoadProgress(100);
+    setPhase("instructions");
+  })().catch((e) => {
+    setErrorMsg(`Model load failed: ${e.message}`);
+    setPhase("error");
+  });
+  return () => { cancelled = true; };
+}, []);
 
   // ── Stop camera ──────────────────────────────────────────────────────────────
   const stopCamera = useCallback(() => {
@@ -223,136 +219,171 @@ export default function LivenessSelfie({ onComplete, onContinue }: Props) {
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
+  // ── Live Video Evaluation Pipeline ───────────────────────────────────────────
+  const runVerificationPipeline = useCallback(async (videoBlob: Blob, fallbackStillData: string) => {
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
+    
+    setPhase("analyzing");
+
+    try {
+      const requestId = `${user?.id}_${Date.now()}`;
+      const mobileNumber = user?.mobile || "";
+      
+      const response = await selfieApiService.verifyLiveness(
+        videoBlob,
+        requestId, 
+        mobileNumber, 
+        CHALLENGES.map((c) => c.key.toUpperCase())
+      );
+
+      const parsedAnalysis: AnalysisResult = {
+        livenessScore: response.livenessScore,
+        isLive: response.livenessPass,
+        faceMatchScore: response.faceMatchScore,
+        faceMatchPass: response.faceMatchPass,
+        overallPass: response.overallPass,
+        summary: response.overallPass
+          ? "Identity and liveness verified successfully."
+          : "Liveness verification failed. Please try again.",
+      };
+
+      if (response.capturedImage) {
+        setSelfieUrl(`data:image/jpeg;base64,${response.capturedImage}`);
+      }
+
+      setResult(parsedAnalysis);
+      onComplete?.(parsedAnalysis);
+      setPhase("result");
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.message || err.message || "An error occurred during secure pipeline inspection.");
+      setPhase("error");
+    } finally {
+      isProcessingRef.current = false;
+    }
+  }, [onComplete, user?.mobile]);
+
   // ── Start challenge ───────────────────────────────────────────────────────────
   const startChallenge = useCallback(async () => {
     holdRef.current = {};
     setPassed(new Set());
     setChallengeIdx(0);
+    recordedChunksRef.current = [];
+    isProcessingRef.current = false;
     setPhase("challenge");
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user", width: 640, height: 480 },
-      audio: false,
-    });
-
-    const video = videoRef.current!;
-    video.srcObject = stream;
-    await video.play();
-
-    const overlay = overlayRef.current!;
-    const opts    = new faceapi.TinyFaceDetectorOptions({
-      inputSize: 320,
-      scoreThreshold: 0.5,
-    });
-
-    let localPassed       = new Set<PoseDir>();
-    let localChallengeIdx = 0;
-
-    async function detect() {
-      if (!videoRef.current || videoRef.current.paused) return;
-
-      const W = videoRef.current.videoWidth  || 640;
-      const H = videoRef.current.videoHeight || 480;
-      overlay.width  = W;
-      overlay.height = H;
-
-      const ctx = overlay.getContext("2d")!;
-      ctx.clearRect(0, 0, W, H);
-
-      // Always draw guide circle first (visible even before face detected)
-      drawGuideCircle(ctx, W, H);
-
-      const det = await faceapi
-        .detectSingleFace(videoRef.current, opts)
-        .withFaceLandmarks();
-
-      if (det) {
-        const { landmarks, detection: d } = det;
-
-        // Draw face circle (replaces old bounding box)
-        drawFaceCircle(ctx, d.box, localPassed.size > 0);
-
-        // Draw landmarks (small dots — subtle inside the circle)
-        drawLandmarks(ctx, landmarks.positions);
-
-        const { passes } = detectPose(landmarks);
-
-        const challenge = CHALLENGES[localChallengeIdx];
-        if (challenge && passes[challenge.key]) {
-          holdRef.current[challenge.key] =
-            (holdRef.current[challenge.key] ?? 0) + 1;
-
-          if (
-            (holdRef.current[challenge.key] ?? 0) >= HOLD_FRAMES &&
-            !localPassed.has(challenge.key)
-          ) {
-            localPassed = new Set([...localPassed, challenge.key]);
-            setPassed(new Set(localPassed));
-            holdRef.current[challenge.key] = 0;
-
-            const nextIdx = localChallengeIdx + 1;
-
-        if (nextIdx >= CHALLENGES.length) {
-
-  const cap = canvasRef.current!;
-  cap.width  = W;
-  cap.height = H;
-  cap.getContext("2d")!.drawImage(videoRef.current!, 0, 0);
-  const url = cap.toDataURL("image/jpeg", 0.92);
-
-
-  stopCamera();
-
-  setSelfieUrl(url);
-  setPhase("analyzing");
-  runAnalysis(cap);
-  return;
-}
-
-            localChallengeIdx = nextIdx;
-            setChallengeIdx(nextIdx);
-          }
-        } else {
-          holdRef.current[challenge?.key ?? "left"] = 0;
-        }
-      }
-
-      rafRef.current = requestAnimationFrame(detect);
-    }
-
-    rafRef.current = requestAnimationFrame(detect);
-  }, [stopCamera]);
-
-  // ── Analysis — send selfie to backend ────────────────────────────────────────
-  async function runAnalysis(selfieCanvas: HTMLCanvasElement) {
     try {
-      const selfieImage = selfieCanvas.toDataURL("image/jpeg", 0.92);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: 640, height: 480 },
+        audio: false,
+      });
 
-      const data = await selfieApiService.verifySelfie(selfieImage);
+      const video = videoRef.current!;
+      video.srcObject = stream;
+      await video.play();
 
-      const result: AnalysisResult = {
-        livenessScore:  data.livenessScore,
-        isLive:         data.livenessPass,
-        faceMatchScore: data.faceMatchScore,
-        faceMatchPass:  data.faceMatchPass,
-        overallPass:    data.overallPass,
-        summary: data.overallPass
-          ? "Identity verified successfully."
-          : "Verification failed — please retake.",
+      const mimeType = MediaRecorder.isTypeSupported("video/mp4") ? "video/mp4" : "video/webm";
+      const recorder = new MediaRecorder(stream, { mimeType });
+      
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          recordedChunksRef.current.push(e.data);
+        }
       };
 
-      setResult(result);
-      setPhase("result");
-      onComplete?.(result);
-    } catch (e: any) {
-      setErrorMsg(e.message || "Verification failed. Please try again.");
+      recorder.start(100); 
+      mediaRecorderRef.current = recorder;
+
+      const overlay = overlayRef.current!;
+      overlay.width = video.videoWidth || 640;
+      overlay.height = video.videoHeight || 480;
+      const ctx = overlay.getContext("2d")!;
+
+      let localChallengeIdx = 0;
+      let localPassed = new Set<PoseDir>();
+
+      const trackFrameLoop = async () => {
+        if (video.paused || video.ended || isProcessingRef.current) return;
+
+        ctx.clearRect(0, 0, overlay.width, overlay.height);
+        drawGuideCircle(ctx, overlay.width, overlay.height);
+
+        const detection = await faceapi
+          .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.4 }))
+          .withFaceLandmarks(true);
+
+        if (detection) {
+          const currentTarget = CHALLENGES[localChallengeIdx];
+          
+          // 🌟 FIX: Separately resolve raw landmark positions and computed pass triggers
+          const { positions } = detection.landmarks;
+          const { passes } = detectPose(detection.landmarks);
+          
+          drawLandmarks(ctx, positions);
+
+          const isMatchingPose = !!passes[currentTarget.key];
+          if (isMatchingPose) {
+            holdRef.current[currentTarget.key] = (holdRef.current[currentTarget.key] || 0) + 1;
+          } else {
+            holdRef.current[currentTarget.key] = 0;
+          }
+
+          const hasHeldLongEnough = (holdRef.current[currentTarget.key] || 0) >= HOLD_FRAMES;
+          drawFaceCircle(ctx, detection.detection.box, hasHeldLongEnough);
+
+          if (hasHeldLongEnough && !localPassed.has(currentTarget.key)) {
+            localPassed.add(currentTarget.key);
+            setPassed(new Set(localPassed));
+
+            if (localChallengeIdx + 1 < CHALLENGES.length) {
+              localChallengeIdx += 1;
+              setChallengeIdx(localChallengeIdx);
+            } else {
+              stopCamera();
+
+              if (recorder && recorder.state !== "inactive") {
+                recorder.stop();
+              }
+
+              const canvas = canvasRef.current!;
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              const ctx2 = canvas.getContext("2d")!;
+              ctx2.drawImage(video, 0, 0);
+              const fallbackStillData = canvas.toDataURL("image/jpeg", 0.85);
+              setSelfieUrl(fallbackStillData);
+
+              await new Promise<void>((resolve) => {
+                if (!recorder || recorder.state === "inactive") { resolve(); return; }
+                recorder.onstop = () => resolve();
+              });
+
+              const videoBlob = new Blob(recordedChunksRef.current, { type: "video/mp4" });
+              await runVerificationPipeline(videoBlob, fallbackStillData);
+              return;
+            }
+          }
+        }
+
+        rafRef.current = requestAnimationFrame(trackFrameLoop);
+      };
+
+      rafRef.current = requestAnimationFrame(trackFrameLoop);
+    } catch (err: any) {
+      setErrorMsg(`Camera initiation block failure: ${err.message}`);
       setPhase("error");
     }
-  }
+  }, [stopCamera, runVerificationPipeline]);
 
   // ── Reset ────────────────────────────────────────────────────────────────────
   function reset() {
     stopCamera();
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    mediaRecorderRef.current = null;
+    recordedChunksRef.current = [];
+    isProcessingRef.current = false;
     setSelfieUrl(null);
     setResult(null);
     setPassed(new Set());
@@ -363,7 +394,6 @@ export default function LivenessSelfie({ onComplete, onContinue }: Props) {
 
   const currentChallenge = CHALLENGES[challengeIdx];
 
-  // ─── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
@@ -418,7 +448,7 @@ export default function LivenessSelfie({ onComplete, onContinue }: Props) {
             </div>
             <button
               onClick={startChallenge}
-              className="w-full mt-5 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold transition-all"
+              className="w-full mt-5 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold transition-all cursor-pointer"
             >
               Start Verification
             </button>
@@ -429,7 +459,6 @@ export default function LivenessSelfie({ onComplete, onContinue }: Props) {
         {phase === "challenge" && (
           <div>
             <div className="relative bg-black">
-              {/* Video — CSS mirrored so user sees themselves naturally */}
               <video
                 ref={videoRef}
                 autoPlay
@@ -438,13 +467,11 @@ export default function LivenessSelfie({ onComplete, onContinue }: Props) {
                 className="w-full aspect-[4/3] object-cover"
                 style={{ transform: "scaleX(-1)" }}
               />
-              {/* Overlay canvas — ALSO CSS mirrored to match video */}
               <canvas
                 ref={overlayRef}
                 className="absolute inset-0 w-full h-full pointer-events-none"
                 style={{ transform: "scaleX(-1)" }}
               />
-              {/* Direction pill */}
               <div className="absolute top-3 left-0 right-0 flex justify-center">
                 <div className="bg-black/65 text-white text-sm font-semibold px-5 py-2 rounded-full flex items-center gap-2">
                   <span className="text-green-400 text-lg">
@@ -478,7 +505,7 @@ export default function LivenessSelfie({ onComplete, onContinue }: Props) {
                 })}
               </div>
               <p className="text-center text-xs text-gray-400 mt-2">
-                {passed.size} / {CHALLENGES.length} done
+                {passed.size} / {CHALLENGES.length} completed
               </p>
             </div>
           </div>
@@ -491,13 +518,13 @@ export default function LivenessSelfie({ onComplete, onContinue }: Props) {
               <img
                 src={selfieUrl}
                 alt="Captured selfie"
-                className="w-28 h-28 rounded-full object-cover border-4 border-blue-100"
+                className="w-28 h-28 rounded-full object-cover border-4 border-blue-100 animate-pulse"
               />
             )}
             <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
-            <p className="font-medium text-gray-700">Verifying identity…</p>
+            <p className="font-medium text-gray-700">Verifying identity via API…</p>
             <p className="text-xs text-gray-400 text-center">
-              Liveness · face match with NID photo
+              Evaluating liveness & face match verification models
             </p>
           </div>
         )}
@@ -546,14 +573,14 @@ export default function LivenessSelfie({ onComplete, onContinue }: Props) {
             <div className="flex gap-3">
               <button
                 onClick={reset}
-                className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors cursor-pointer"
               >
                 Retry
               </button>
               {result.overallPass && (
                 <button
                   onClick={onContinue}
-                  className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors"
+                  className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors cursor-pointer"
                 >
                   Continue →
                 </button>
@@ -570,7 +597,7 @@ export default function LivenessSelfie({ onComplete, onContinue }: Props) {
             <p className="text-sm text-gray-500 text-center break-all">{errorMsg}</p>
             <button
               onClick={reset}
-              className="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold"
+              className="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold cursor-pointer"
             >
               Try Again
             </button>

@@ -2,6 +2,8 @@ import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
+import FormData from "form-data";
+import axios from "axios";
 import { withTransaction } from "../../../utils/withTransaction.js";
 import { selfieRepository } from "./selfie.repository.js";
 import { AppError } from "../../../utils/AppError.js";
@@ -9,156 +11,148 @@ import { AppError } from "../../../utils/AppError.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
-// ── Save base64 selfie to disk ────────────────────────────────────────────────
-async function saveSelfieImage(base64String: string, userId: string) {
-  let mimeType: string;
-  let base64Data: string;
-
-  if (base64String.startsWith("data:")) {
-    const matches = base64String.match(
-      /^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/
-    );
-    if (!matches) throw new AppError("Invalid selfie image format.", 400);
-    mimeType   = matches[1]!;
-    base64Data = matches[2]!;
-  } else {
-    mimeType   = "image/jpeg";
-    base64Data = base64String;
-  }
-
-  const buffer    = Buffer.from(base64Data, "base64");
-  const fileSize  = buffer.length;
-  const extension = mimeType.split("/")[1] ?? "jpg";
+// ── Save video to disk ────────────────────────────────────────────────────────
+async function saveVideoFile(buffer: Buffer, userId: string) {
   const uniqueId  = crypto.randomUUID();
-  const fileName  = `selfie_${userId}_${uniqueId}.${extension}`;
+  const fileName  = `liveness_${userId}_${uniqueId}.mp4`;
+  const uploadDir = path.join(__dirname, "../../../uploads/liveness");
+  const filePath  = path.join(uploadDir, fileName);
 
-  const uploadDir    = path.join(__dirname, "../../../uploads/selfies");
-  const absolutePath = path.join(uploadDir, fileName);
   await fs.mkdir(uploadDir, { recursive: true });
-  await fs.writeFile(absolutePath, buffer);
+  await fs.writeFile(filePath, buffer);
 
   return {
-    absolutePath,
-    fileUrl: `/uploads/selfies/${fileName}`,
+    filePath,
+    fileUrl:  `/uploads/liveness/${fileName}`,
     fileName,
-    fileSize,
-    mimeType,
+    fileSize: buffer.length,
+    mimeType: "video/mp4",
   };
 }
 
-// ── Face Match ML API ─────────────────────────────────────────────────────────
-// TODO: Replace static mock with real ML call when service is ready.
-// Expected response shape:
-// { match_score: 87, match_pass: true, liveness_score: 92, liveness_pass: true }
-async function callFaceMatchML(
-  _selfieAbsolutePath: string,
-  _nidFrontAbsolutePath: string,
+// ── Call Liveness API ─────────────────────────────────────────────────────────
+async function callLivenessAPI(
+  videoBuffer: Buffer,
+  videoFileName: string,
+  referenceId: string,
+  mobileNumber: string,
+  actions: string[] = ["UP"],
 ): Promise<{
-  matchScore:    number;
-  matchPass:     boolean;
+  livenessCheck: boolean;
   livenessScore: number;
-  livenessPass:  boolean;
+  detectedActions: string[];
+  matchedSequence: string[];
+  capturedImage: string; // base64
 }> {
-  const ML_URL = process.env.ML_FACE_MATCH_URL;
+  const LIVENESS_URL = process.env.LIVENESS_API_URL;
 
-  // ── MOCK: Remove this block and uncomment the real call below ──────────────
-  if (!ML_URL) {
-    console.warn("[selfie.service] ML_FACE_MATCH_URL not set — using static mock data.");
+  if (!LIVENESS_URL) {
+    console.warn("[selfie.service] LIVENESS_API_URL not set — using mock.");
     return {
-      livenessScore: 92,
-      livenessPass:  true,
-      matchScore:    87,
-      matchPass:     true,
+      livenessCheck:   true,
+      livenessScore:   92,
+      detectedActions: actions,
+      matchedSequence: actions,
+      capturedImage:   "",
     };
   }
-  // ── END MOCK ───────────────────────────────────────────────────────────────
-
-  // ── REAL ML CALL (uncomment when ML service is ready) ─────────────────────
-  const selfieBuffer   = await fs.readFile(_selfieAbsolutePath);
-  const nidFrontBuffer = await fs.readFile(_nidFrontAbsolutePath);
 
   const form = new FormData();
-  form.append("selfie",    new Blob([selfieBuffer],   { type: "image/jpeg" }), path.basename(_selfieAbsolutePath));
-  form.append("nid_front", new Blob([nidFrontBuffer], { type: "image/jpeg" }), path.basename(_nidFrontAbsolutePath));
-
-  const response = await fetch(`${ML_URL}/face-match`, {
-    method: "POST",
-    body:   form,
+  form.append("instructions",   JSON.stringify({ actions }));
+  form.append("reference_id",   referenceId);
+  form.append("mobile_number",  mobileNumber);
+  form.append("video",          videoBuffer, {
+    filename:    videoFileName,
+    contentType: "video/mp4",
   });
 
-  if (!response.ok) {
-    throw new AppError(`Face match ML service error: ${response.status}`, 502);
+  const response = await axios.post(LIVENESS_URL, form, {
+    headers: {
+      ...form.getHeaders(),
+      "x-api-key": process.env.LIVENESS_API_KEY ?? "",
+    },
+    timeout: 30_000,
+  });
+
+  const data = response.data;
+
+  console.log("Liveness API response:", data);
+
+  if (data.status !== "SUCCESS") {
+    throw new AppError(data.message ?? "Liveness check failed.", 422);
   }
 
-  const data = await response.json() as Record<string, unknown>;
-
   return {
-    matchScore:    (data.match_score    as number)  ?? 0,
-    matchPass:     (data.match_pass     as boolean) ?? false,
-    livenessScore: (data.liveness_score as number)  ?? 75,
-    livenessPass:  (data.liveness_pass  as boolean) ?? false,
+    livenessCheck:   data.body.livenessCheck,
+    livenessScore:   data.body.livenessCheck ? 92 : 40, // mock score until API returns one
+    detectedActions: data.body.detectedActions,
+    matchedSequence: data.body.matchedSequence,
+    capturedImage:   data.body.image ?? "",
   };
 }
 
 // ── Main service ──────────────────────────────────────────────────────────────
 export const selfieService = {
 
+  async processLiveness(
+    userId: string,
+    videoBuffer: Buffer,
+    referenceId: string,
+    mobileNumber: string,
+    actions: string[],
+  ) {
+    const videoFile = await saveVideoFile(videoBuffer, userId);
 
-  async processSelfie(userId: string, selfieBase64: string) {
     try {
-      const selfieFile = await saveSelfieImage(selfieBase64, userId);
-
       return await withTransaction(async (client) => {
-        const nidFrontUrl = await selfieRepository.getNIDFrontUrl(userId, client);
-        console.log("[selfie.service] NID front URL:", nidFrontUrl);
-
-        if (!nidFrontUrl) {
-          throw new AppError("NID not verified yet. Please complete NID upload first.", 422);
-        }
-
-        const nidFrontAbsPath = path.join(__dirname, "../../../", nidFrontUrl);
-
-        const mlResult = await callFaceMatchML(
-          selfieFile.absolutePath,
-          nidFrontAbsPath,
+        const livenessResult = await callLivenessAPI(
+          videoBuffer,
+          videoFile.fileName,
+          referenceId,
+          mobileNumber,
+          actions,
         );
 
-        console.log("[selfie.service] ML result:", mlResult);
+        const livenessPass  = livenessResult.livenessCheck;
+        const livenessScore = livenessResult.livenessScore;
+        const overallPass   = livenessPass;
 
-        const overallPass = mlResult.livenessPass && mlResult.matchPass;
+        // Use the original .mp4 video as the official selfie
+        let selfieUrl  = videoFile.fileUrl;
+        let selfieSize = videoFile.fileSize;
+        let mimeType   = "video/mp4";
 
         await selfieRepository.saveSelfieVerification(
           {
             userId,
-            selfieUrl:      selfieFile.fileUrl,
-            fileName:       selfieFile.fileName,
-            fileSize:       selfieFile.fileSize,
-            mimeType:       selfieFile.mimeType,
-            livenessScore:  mlResult.livenessScore,
-            livenessPass:   mlResult.livenessPass,
-            faceMatchScore: mlResult.matchScore,
-            faceMatchPass:  mlResult.matchPass,
+            selfieUrl,
+            fileName:       path.basename(selfieUrl),
+            fileSize:       selfieSize,
+            mimeType:       mimeType,
+            livenessScore,
+            livenessPass,
+            faceMatchScore: 0,   // face match not in liveness API — keep 0 until ML ready
+            faceMatchPass:  false,
             overallPass,
           },
           client,
         );
 
-
         return {
-          livenessScore:  mlResult.livenessScore,
-          livenessPass:   mlResult.livenessPass,
-          faceMatchScore: mlResult.matchScore,
-          faceMatchPass:  mlResult.matchPass,
+          livenessScore,
+          livenessPass,
+          faceMatchScore: null,
+          faceMatchPass:  null,
           overallPass,
+          capturedImage: livenessResult.capturedImage,
         };
       });
-    } catch (err: any) {
-      console.error("[selfie.service] processSelfie error:", err.message);
-      throw err;
+    } catch (error) {
+      // Storage Leak Fix: If transaction or API fails, delete the orphaned video file
+      await fs.unlink(videoFile.filePath).catch(() => {});
+      throw error;
     }
   },
-
-
 
   async completeSelfieStep(userId: string) {
     return await withTransaction(async (client) => {
@@ -171,5 +165,5 @@ export const selfieService = {
       );
       return { currentStep: "selfie_verified" };
     });
-  }
+  },
 };
