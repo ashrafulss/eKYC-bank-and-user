@@ -60,6 +60,7 @@ export const nomineeService = {
       const backFile = await saveNomineeFile(backImage, userId, `back_${uniqueId}`);
       attachedDocs.push({ docType: "nid_back", ...backFile });
 
+      // Mock ML payload output data model
       const mockMlData = {
         name: "Anika Chowdhury",
         relationship: "Spouse",
@@ -82,14 +83,17 @@ export const nomineeService = {
   },
 
   async processNomineeRecords(userId: string, nomineesList: IncomingNomineeInput[]) {
+    // 1. Core structural aggregate checking logic
     const totalShares = nomineesList.reduce((sum, nom) => sum + Number(nom.sharePercent || 0), 0);
     if (totalShares <= 0 || totalShares > 100) {
       throw new BadRequestError(`Total aggregate nominee allocations must sum up between 1% and 100%. Provided: ${totalShares}%`);
     }
 
     return await withTransaction(async (client) => {
+      // 2. Clear out older configurations or updates using transaction repository
       const count = await nomineeRepository.clearAndUpsertNominees(userId, nomineesList, client);
       
+      // 3. Advance state pipeline purely to nominee validation target
       await nomineeRepository.advanceStepToNomineeDone(userId, client);
 
       return {
