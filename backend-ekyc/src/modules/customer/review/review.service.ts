@@ -1,4 +1,4 @@
-// review.service.ts
+
 import pool from "../../../config/db.js";
 import { reviewRepository } from "./review.repository.js";
 
@@ -33,10 +33,16 @@ export const reviewService = {
           fullNameBangla: app.full_name_bangla || ocr.name_bn || "—",
           dob: app.date_of_birth ? new Date(app.date_of_birth).toISOString().split("T")[0] : ocr.date_of_birth || "—",
           gender: app.gender ? app.gender.toUpperCase() : ocr.gender || "MALE",
+          fatherNameBangla: app.father_name_bangla || ocr.father_name_bn || "—",
+          motherNameBangla: app.mother_name_bangla || ocr.mother_name_bn || "—",
+          spouseName: app.spouse_name || "—",
           nidNumber: app.nid_number || ocr.nid_no || "—",
+          bloodGroup: app.blood_group || "—",
+          birthPlace: app.birth_place || "—",
+          email: app.email || "—",
           mobile: app.mobile || "—",
           presentAddress: presentAddressFormatted,
-          email: app.email || "—",
+          postCode: app.postal_code || "—", // Mapped directly from address table column
           occupation: app.occupation || "—",
           employer: app.employer_name || "—",
           monthlyIncome: app.monthly_income || "—",
@@ -50,7 +56,7 @@ export const reviewService = {
           contact: n.contact || "—",
         })),
         boPrefs: {
-          accountType: bo?.account_type || "Individual (Resident)",
+          accountType: bo?.account_type || "Individual",
           dp: bo?.depository_participant || "—",
           bank: bo?.bank_name || "—",
           settlementAccount: bo?.settlement_account || "—",
@@ -58,7 +64,7 @@ export const reviewService = {
         },
         permissions: {
           cash: bo?.permission_cash ?? true,
-          margin: bo?.permission_margin ?? true,
+          margin: bo?.permission_margin ?? false,
           foreign: bo?.permission_foreign ?? false,
         }
       };

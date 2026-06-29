@@ -1,4 +1,4 @@
-// review.repository.ts
+
 import type { PoolClient } from "pg";
 
 export const reviewRepository = {
@@ -14,6 +14,9 @@ export const reviewRepository = {
         personal.full_name_bangla,
         personal.father_name_bangla,
         personal.mother_name_bangla,
+        personal.spouse_name,
+        personal.blood_group,
+        personal.birth_place,
         personal.nid_number,
         personal.date_of_birth,
         personal.gender,
