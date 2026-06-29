@@ -1,0 +1,11 @@
+node_modules
+dist
+build
+.git
+.gitignore
+npm-debug.log
+Dockerfile
+docker-compose.yml
+pgdata_second
+*.log
+.env
