@@ -13,7 +13,7 @@ export const boService = {
       await boRepository.advanceStepToBoDone(userId, client);
 
       return {
-        currentStep: "bo_done" as const
+        currentStep: "bo_details_done" as const
       };
     });
   }

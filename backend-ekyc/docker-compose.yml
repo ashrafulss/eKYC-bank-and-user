@@ -1,4 +1,3 @@
-
 services:
   postgres_second:
     image: postgres:17.5-alpine
@@ -42,3 +41,35 @@ services:
       - PORT=5000
       - DATABASE_URL=postgres://postgres:sa@postgres_second:5432/ekyc
       - NID_OCR_URL=http://mockoon_service:3002/api/v1/nid/info
+
+  frontend_bank:
+    image: node:20-alpine
+    container_name: ekyc_frontend_bank
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../bank-ekyc:/app
+      - /app/node_modules
+    environment:
+      - PORT= 3000
+      - NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
+    depends_on:
+      - backend_api
+
+  frontend_user:
+    image: node:20-alpine
+    container_name: ekyc_frontend_user
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    ports:
+      - "3001:3001"
+    volumes:
+      - ../ekyc-frontend:/app
+      - /app/node_modules
+    environment:
+      - PORT=3001
+      - NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
+    depends_on:
+      - backend_api

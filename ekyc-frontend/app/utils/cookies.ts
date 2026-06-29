@@ -7,6 +7,7 @@ export const STEP_VALUES = {
   SELFIE_VERIFIED: "selfie_verified",
   BASIC_INFO_DONE: "basic_info_done",
   NOMINEE_DONE: "nominee_done",
+  BO_DETAILS_DONE: "bo_details_done",
   REVIEW_DONE: "review_done",
   SUBMITTED: "submitted",
 } as const;

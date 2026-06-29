@@ -8,6 +8,7 @@ export const STEP_ORDER = [
   "selfie_verified",
   "basic_info_done",
   "nominee_done",
+  "bo_details_done",
   "review_done",
   "submitted",
 ] as const;

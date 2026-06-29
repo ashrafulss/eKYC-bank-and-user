@@ -8,8 +8,9 @@ const STEP_ROUTE_MAP: Record<string, string> = {
   "phone_number_verified": "/register/nid-verification",
   "nid_verified":           "/register/selfie",
   "selfie_verified":        "/register/basic-informations",
-  "basic_info_done":        "/register/nominee-bo",
-  "nominee_done":           "/register/review",
+  "basic_info_done":        "/register/nominee",
+  "nominee_done":           "/register/bo-details",
+  "bo_details_done":        "/register/review",
   "review_done":            "/register/submitted",
   "submitted":              "/profile", 
 };
@@ -31,7 +32,7 @@ export async function proxy(request: NextRequest) {
 
   if (sessionToken) {
     try {
-      const backendResponse = await fetch("http://localhost:5000/api/v1/auth/me", {
+      const backendResponse = await fetch("http://ekyc_backend_api:5000/api/v1/auth/me", {
         headers: {
           "Authorization": `Bearer ${sessionToken}`,
           "Cookie": `next_auth_session=${sessionToken}`

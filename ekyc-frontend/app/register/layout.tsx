@@ -57,19 +57,19 @@ function AnimatedLine({ done, delay, isLast }: { done: boolean; delay: number; i
               triggered
                 ? isLast
                   ? {
-                      // draw once, then wiggle forever
-                      animation: `
+                    // draw once, then wiggle forever
+                    animation: `
                         snake-draw   800ms ease-in-out ${delay}ms 1 forwards,
                         snake-wiggle 400ms ease-in-out ${delay + 800}ms infinite
                       `,
-                    }
+                  }
                   : {
-                      // draw once, wiggle 3 times, then settle
-                      animation: `
+                    // draw once, wiggle 3 times, then settle
+                    animation: `
                         snake-draw   800ms ease-in-out ${delay}ms 1 forwards,
                         snake-wiggle 300ms ease-in-out ${delay}ms 3
                       `,
-                    }
+                  }
                 : {}
             }
           />
@@ -88,9 +88,10 @@ export default function RegisterLayout({ children }: { children: React.ReactNode
     "nid-verification": 2,
     selfie: 3,
     "basic-informations": 4,
-    "nominee-bo": 5,
-    review: 6,
-    // submitted: 7,
+    "nominee": 5,
+
+    "bo-details": 6,
+    review: 7,
   };
 
   const currentRouteName = pathname.split("/register/")[1]?.split("/")[0] || "";
@@ -98,16 +99,16 @@ export default function RegisterLayout({ children }: { children: React.ReactNode
   const showNavbar = currentStep > 1;
 
   const steps = [
-    { num: 1, title: "Mobile",     subtitle: "OTP verification" },
-    { num: 2, title: "NID",        subtitle: "Capture & OCR" },
-    { num: 3, title: "Selfie",     subtitle: "Liveness check" },
+    { num: 1, title: "Mobile", subtitle: "OTP verification" },
+    { num: 2, title: "NID", subtitle: "Capture & OCR" },
+    { num: 3, title: "Selfie", subtitle: "Liveness check" },
     { num: 4, title: "Basic Info", subtitle: "Personal details" },
-    { num: 5, title: "Nominee",    subtitle: "Beneficiary setup" },
-    { num: 6, title: "Review",     subtitle: "Confirm details" },
-    // { num: 7, title: "Submitted",  subtitle: "Complete" },
+    { num: 5, title: "Nominee", subtitle: "Beneficiary setup" },
+    { num: 6, title: "BO Details", subtitle: "BO Account details" },
+    { num: 7, title: "Review", subtitle: "Confirm details" },
   ];
 
-  const completionPct = Math.round(((currentStep - 1) / 6) * 100);
+  const completionPct = Math.round(((currentStep - 1) / 7) * 100);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
@@ -125,13 +126,12 @@ export default function RegisterLayout({ children }: { children: React.ReactNode
                 <div key={step.num} className="flex-1">
                   <div className="flex items-start">
 
-                    <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm transition-all ${
-                      done
-                        ? "bg-green-600 text-white"
-                        : active
-                          ? "bg-blue-900 text-white ring-4 ring-blue-100"
-                          : "bg-gray-100 text-gray-400"
-                    }`}>
+                    <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm transition-all ${done
+                      ? "bg-green-600 text-white"
+                      : active
+                        ? "bg-blue-900 text-white ring-4 ring-blue-100"
+                        : "bg-gray-100 text-gray-400"
+                      }`}>
                       {done ? (
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -139,7 +139,7 @@ export default function RegisterLayout({ children }: { children: React.ReactNode
                       ) : step.num}
                     </div>
 
-                    {step.num < 6 && (
+                    {step.num < 7 && (
                       <AnimatedLine
                         done={done}
                         delay={(step.num - 1) * 200}
@@ -150,9 +150,8 @@ export default function RegisterLayout({ children }: { children: React.ReactNode
                   </div>
 
                   <div className="mt-2 hidden md:block">
-                    <p className={`text-xs font-semibold ${
-                      active ? "text-blue-900" : done ? "text-green-700" : "text-gray-400"
-                    }`}>
+                    <p className={`text-xs font-semibold ${active ? "text-blue-900" : done ? "text-green-700" : "text-gray-400"
+                      }`}>
                       {step.title}
                     </p>
                     <p className="text-xs text-gray-400">{step.subtitle}</p>

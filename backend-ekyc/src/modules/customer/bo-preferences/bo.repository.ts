@@ -86,7 +86,7 @@ export const boRepository = {
   async advanceStepToBoDone(userId: string, client: PoolClient) {
     await client.query(
       `UPDATE public.users 
-       SET current_step = 'nominee_done'::public.registration_step, updated_at = NOW() 
+       SET current_step = 'bo_details_done'::public.registration_step, updated_at = NOW() 
        WHERE id = $1`,
       [userId]
     );

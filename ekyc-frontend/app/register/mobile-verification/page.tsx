@@ -34,8 +34,10 @@ export default function MobileVerification() {
       case "selfie_verified":
         return "/register/basic-informations";
       case "basic_info_done":
-        return "/register/nominee-bo";
+        return "/register/nominee";
       case "nominee_done":
+        return "/register/bo-details";
+      case "bo_details_done":
         return "/register/review";
       case "review_done":
       case "submitted":
@@ -46,22 +48,22 @@ export default function MobileVerification() {
   };
 
 
-const startTimer = useCallback((seconds: number) => {
-  if (timerRef.current) clearInterval(timerRef.current);
-  setTimeLeft(seconds);   // ← use passed value
-  setCanResend(false);
+  const startTimer = useCallback((seconds: number) => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setTimeLeft(seconds);   // ← use passed value
+    setCanResend(false);
 
-  timerRef.current = setInterval(() => {
-    setTimeLeft((prev) => {
-      if (prev <= 1) {
-        clearInterval(timerRef.current!);
-        setCanResend(true);
-        return 0;
-      }
-      return prev - 1;
-    });
-  }, 1000);
-}, []);
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          setCanResend(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -81,14 +83,14 @@ const startTimer = useCallback((seconds: number) => {
     return `${m}:${s}`;
   };
 
- 
-const formatTimeOnlySecond = (seconds: number) => {
-  return `${seconds}s`; 
-};
+
+  const formatTimeOnlySecond = (seconds: number) => {
+    return `${seconds}s`;
+  };
 
   const validateBD = (value: string) => /^1[3-9]\d{8}$/.test(value);
 
- 
+
   const handleSendOTP = async () => {
     if (!validateBD(mobile)) {
       setError("Enter a valid Bangladeshi mobile number");
@@ -98,42 +100,42 @@ const formatTimeOnlySecond = (seconds: number) => {
     setError("");
     setLoading(true);
 
-     try {
-    const response = await authService.sendOtp({
-      mobile: `+880${mobile}`,
-      deliveryMethod: "both",
-    });
+    try {
+      const response = await authService.sendOtp({
+        mobile: `+880${mobile}`,
+        deliveryMethod: "both",
+      });
 
-    setOtp(["", "", "", "", "", ""]);
-    setModalError("");
-    setShowModal(true);
-    startTimer(response.data.otpExpirySecond);  // ← call startTimer with seconds
-  } catch (err: any) {
-    setError(err.message || "Failed to deliver OTP request. Please retry.");
-  } finally {
-    setLoading(false);
-  }
+      setOtp(["", "", "", "", "", ""]);
+      setModalError("");
+      setShowModal(true);
+      startTimer(response.data.otpExpirySecond);  // ← call startTimer with seconds
+    } catch (err: any) {
+      setError(err.message || "Failed to deliver OTP request. Please retry.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-const handleResend = async () => {
-  if (!canResend) return;
-  setLoading(true);
-  setModalError("");
+  const handleResend = async () => {
+    if (!canResend) return;
+    setLoading(true);
+    setModalError("");
 
-  try {
-    const response = await authService.sendOtp({
-      mobile: `+880${mobile}`,
-      deliveryMethod: "both",
-    });
-    setOtp(["", "", "", "", "", ""]);
-    setTimeout(() => inputsRef.current[0]?.focus(), 100);
-    startTimer(response.data.otpExpirySecond);  // ← use dynamic value here too
-  } catch (err: any) {
-    setModalError(err.message || "Resend request failed.");
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      const response = await authService.sendOtp({
+        mobile: `+880${mobile}`,
+        deliveryMethod: "both",
+      });
+      setOtp(["", "", "", "", "", ""]);
+      setTimeout(() => inputsRef.current[0]?.focus(), 100);
+      startTimer(response.data.otpExpirySecond);  // ← use dynamic value here too
+    } catch (err: any) {
+      setModalError(err.message || "Resend request failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
   const handleOtpChange = (value: string, index: number) => {
     if (!/^\d?$/.test(value)) return;
     setModalError("");
@@ -176,7 +178,7 @@ const handleResend = async () => {
       const dbStep = result.user?.current_step;
 
       if (dbStep) {
-        cookieUtil.setRegStep(dbStep as any); 
+        cookieUtil.setRegStep(dbStep as any);
       } else {
         cookieUtil.setRegStep("phone_number_verified" as any);
       }
@@ -338,11 +340,10 @@ const handleResend = async () => {
                 type="button"
                 onClick={handleResend}
                 disabled={!canResend || loading}
-                className={`text-xs font-bold transition-colors ${
-                  canResend && !loading
-                    ? "text-blue-600 hover:text-blue-700 cursor-pointer"
-                    : "text-gray-300 cursor-not-allowed"
-                }`}
+                className={`text-xs font-bold transition-colors ${canResend && !loading
+                  ? "text-blue-600 hover:text-blue-700 cursor-pointer"
+                  : "text-gray-300 cursor-not-allowed"
+                  }`}
               >
                 {loading ? "Requesting..." : "Resend OTP"}
               </button>
