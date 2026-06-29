@@ -1,15 +1,17 @@
 import type { PoolClient } from "pg";
 
 export interface UpdatePersonalInfoInput {
-  applicationId: string;
-  fullNameBangla: string;
+  applicationId:    string;
+  fullNameEnglish:  string;   // ← add
+  fullNameBangla:   string;
   fatherNameBangla: string;
   motherNameBangla: string;
-  email: string;
-  occupation: string;
-  employerName: string;
-  monthlyIncome: string;
-  presentAddress: string; // This maps directly into address_line1
+  nidNumber:        string;   // ← add
+  email:            string;
+  occupation:       string;
+  employerName:     string;
+  monthlyIncome:    string;
+  presentAddress:   string;
 }
 
 export const basicInfoRepository = {
@@ -55,28 +57,32 @@ export const basicInfoRepository = {
   async updatePersonalInfo(input: UpdatePersonalInfoInput, client: PoolClient): Promise<void> {
     // 1. Update personal data fields
     await client.query(
-      `UPDATE public.personal_info 
-       SET 
-         full_name_bangla = $1,
-         father_name_bangla = $2,
-         mother_name_bangla = $3,
-         email = $4,
-         occupation = $5,
-         employer_name = $6,
-         monthly_income = $7,
-         updated_at = NOW() 
-       WHERE application_id = $8`,
-      [
-        input.fullNameBangla,
-        input.fatherNameBangla,
-        input.motherNameBangla,
-        input.email,
-        input.occupation,
-        input.employerName,
-        input.monthlyIncome,
-        input.applicationId
-      ]
-    );
+  `UPDATE public.personal_info 
+   SET 
+     first_name         = $1,
+     full_name_bangla   = $2,
+     father_name_bangla = $3,
+     mother_name_bangla = $4,
+     nid_number         = $5,
+     email              = $6,
+     occupation         = $7,
+     employer_name      = $8,
+     monthly_income     = $9,
+     updated_at         = NOW() 
+   WHERE application_id = $10`,
+  [
+    input.fullNameEnglish,   // $1  → first_name (full english name)
+    input.fullNameBangla,    // $2
+    input.fatherNameBangla,  // $3
+    input.motherNameBangla,  // $4
+    input.nidNumber,         // $5
+    input.email,             // $6
+    input.occupation,        // $7
+    input.employerName,      // $8
+    input.monthlyIncome,     // $9
+    input.applicationId,     // $10
+  ]
+);
 
     // 2. 🌟 FIXED: Upserts the customized address directly to the address_line1 column
     await client.query(
