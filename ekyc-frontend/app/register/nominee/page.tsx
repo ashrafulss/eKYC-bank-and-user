@@ -285,7 +285,7 @@ export default function NomineeSetup() {
       );
 
       await nomineeService.submitNominees(transformedNominees);
-      router.push("/register/review");
+      router.push("/register/bo-details");
     } catch (err: any) {
       setGlobalError(err.response?.data?.message || err.message || "An unexpected configuration error occurred during serialization pipelines.");
     } finally {

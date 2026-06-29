@@ -19,6 +19,7 @@ CREATE TYPE registration_step AS ENUM (
   'selfie_verified',
   'basic_info_done',
   'nominee_done',
+  'bo_details_done',
   'review_done',
   'submitted'
 );
