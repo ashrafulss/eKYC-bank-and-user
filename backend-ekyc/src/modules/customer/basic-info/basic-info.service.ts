@@ -24,7 +24,7 @@ export const basicInfoService = {
         gender: data.gender ? data.gender.toUpperCase() : ocr.gender || "MALE",
         nidNumber: data.nid_number ||  ocr.nid_no || "",
         mobile: data.mobile || "",
-        presentAddress: data.raw_present_address || ocr.present_address || "",
+        presentAddress: data.address_line1 || ocr.present_address || "",
         email: data.email || "",
         occupation: data.occupation || "", 
         employer: data.employer_name || "",   
@@ -35,33 +35,44 @@ export const basicInfoService = {
     }
   },
 
-  async saveBasicProfile(userId: string, profileDto: PrepopulatedProfileDTO): Promise<void> {
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
 
-      // 🌟 Persist ALL fields directly into their real relational database destinations
-      await basicInfoRepository.updatePersonalInfo({
-        applicationId: profileDto.applicationId,
-        fullNameBangla: profileDto.fullNameBangla,
-        fatherNameBangla: profileDto.fatherNameBangla,
-        motherNameBangla: profileDto.motherNameBangla,
-        email: profileDto.email,
-        occupation: profileDto.occupation,
-        employerName: profileDto.employer,
-        monthlyIncome: profileDto.monthlyIncome,
-        presentAddress: profileDto.presentAddress
-      }, client);
+async saveBasicProfile(userId: string, profileDto: PrepopulatedProfileDTO): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
 
-      // Advance wizard tracking phase status
-      await basicInfoRepository.updateUserWizardStep(userId, "basic_info_done", client);
 
-      await client.query("COMMIT");
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    } finally {
-      client.release();
-    }
+    const appResult = await client.query(
+      `SELECT id FROM public.applications WHERE user_id = $1 LIMIT 1`,
+      [userId]
+    );
+    if (!appResult.rows.length) throw new Error("Application not found.");
+    const applicationId = appResult.rows[0].id;
+
+await basicInfoRepository.updatePersonalInfo({
+  applicationId,
+  fullNameEnglish:  profileDto.fullNameEnglish,  
+  fullNameBangla:   profileDto.fullNameBangla,
+  fatherNameBangla: profileDto.fatherNameBangla,
+  motherNameBangla: profileDto.motherNameBangla,
+  nidNumber:        profileDto.nidNumber,         
+  email:            profileDto.email,
+  occupation:       profileDto.occupation,
+  employerName:     profileDto.employer,
+  monthlyIncome:    profileDto.monthlyIncome,
+  presentAddress:   profileDto.presentAddress,
+}, client);
+
+    await basicInfoRepository.updateUserWizardStep(userId, "basic_info_done", client);
+
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
   }
+}
+
+
 };
