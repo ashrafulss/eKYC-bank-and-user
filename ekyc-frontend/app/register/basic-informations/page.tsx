@@ -29,12 +29,14 @@ function BanglaKeyboard({
   onChange,
   onClose,
   anchorRef,
+  inputRef, // Received input element reference to control cursor focus
 }: {
   field: string;
   value: string;
   onChange: (val: string) => void;
   onClose: () => void;
   anchorRef: React.RefObject<HTMLDivElement | null>;
+  inputRef: React.RefObject<HTMLInputElement | null>;
 }) {
   const [shiftState, setShiftState] = useState<0 | 1 | 2>(0);
 
@@ -43,8 +45,8 @@ function BanglaKeyboard({
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0 });
 
-  // Dynamic Sizing states (Default width: 448px, height: 260px)
-  const [dimensions, setDimensions] = useState({ width: 448, height: 260 });
+  // Dynamic Sizing states (Default set to absolute minimum bounds)
+  const [dimensions, setDimensions] = useState({ width: 340, height: 260 });
   const [isResizing, setIsResizing] = useState(false);
   const resizeStart = useRef({ x: 0, y: 0, w: 0, h: 0 });
 
@@ -57,24 +59,39 @@ function BanglaKeyboard({
       const rect = anchorRef.current.getBoundingClientRect();
       setPosition({
         top: rect.bottom + window.scrollY + 8,
-        left: Math.max(16, rect.left + window.scrollX + (rect.width - 448) / 2),
+        left: Math.max(16, rect.left + window.scrollX + (rect.width - 340) / 2),
       });
     }
   }, [anchorRef]);
 
+  // Helper function to return cursor focus back to field instantly
+  const restoreFocus = () => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
   const handleKey = (char: string) => {
     onChange(value + char);
     if (shiftState === 1) setShiftState(0);
+    restoreFocus();
   };
 
-  const handleBackspace = () => onChange(value.slice(0, -1));
-  const handleSpace = () => onChange(value + " ");
-  const handleClear = () => onChange("");
+  const handleSpace = () => {
+    onChange(value + " ");
+    restoreFocus();
+  };
+
+  const handleClear = () => {
+    onChange("");
+    restoreFocus();
+  };
 
   const handleShiftToggle = () => {
     if (shiftState === 0) setShiftState(1);
     else if (shiftState === 1) setShiftState(2);
     else setShiftState(0);
+    restoreFocus();
   };
 
   // ── Drag Logic (Header Bar Interaction) ──
@@ -192,6 +209,7 @@ function BanglaKeyboard({
                   key={char}
                   type="button"
                   onClick={() => handleKey(char)}
+                  onMouseDown={(e) => e.preventDefault()} // Fix focus steal
                   className="w-full h-full flex items-center justify-center bg-slate-800 hover:bg-cyan-600 active:bg-cyan-700 text-slate-100 hover:text-white rounded text-xs sm:text-sm font-semibold transition-colors shadow-sm cursor-pointer min-h-[32px]"
                 >
                   {char}
@@ -202,10 +220,11 @@ function BanglaKeyboard({
         </div>
 
         {/* Action Bottom Utility Rows */}
-        <div className="grid grid-cols-10 gap-1 pt-1 shrink-0 h-10 mt-1">
+        <div className="grid grid-cols-10 gap-1 pt-1 shrink-0 h-10 mt-1 ">
           <button
             type="button"
             onClick={handleShiftToggle}
+            onMouseDown={(e) => e.preventDefault()} // Fix focus steal
             className={`col-span-2 h-full text-[11px] font-bold uppercase rounded transition-all cursor-pointer flex items-center justify-center border-b-2 gap-0.5 ${shiftState === 2
               ? "bg-amber-600 border-amber-800 text-slate-950 font-extrabold"
               : shiftState === 1
@@ -219,22 +238,18 @@ function BanglaKeyboard({
           <button
             type="button"
             onClick={handleSpace}
+            onMouseDown={(e) => e.preventDefault()} // Fix focus steal
             className="col-span-4 h-full bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-300 font-medium text-xs border-b-2 border-slate-900 rounded transition-all flex items-center justify-center tracking-widest cursor-pointer"
           >
             SPACE
           </button>
 
-          <button
-            type="button"
-            onClick={handleBackspace}
-            className="col-span-2 h-full bg-red-600/90 hover:bg-red-600 text-white font-bold text-xs border-b-2 border-red-800 rounded transition-all flex items-center justify-center gap-1 cursor-pointer"
-          >
-            ⌫ DEL
-          </button>
+
 
           <button
             type="button"
             onClick={handleClear}
+            onMouseDown={(e) => e.preventDefault()} // Fix focus steal
             className="col-span-2 h-full bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-500 hover:text-slate-400 font-medium text-[10px] uppercase rounded transition-all flex items-center justify-center cursor-pointer"
           >
             CLEAR
@@ -276,6 +291,7 @@ function BanglaField({
   const [showKeyboard, setShowKeyboard] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputWrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null); // Reference hook for focus lock
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -289,7 +305,7 @@ function BanglaField({
   }, []);
 
   const handleInputChange = (inputValue: string) => {
-    const banglaOnlyFiltered = inputValue.replace(/[^ \u0980-\u09ff]/g, "");
+    const banglaOnlyFiltered = inputValue.replace(/[a-zA-Z0-9]/g, "");
     onChange(banglaOnlyFiltered);
   };
 
@@ -301,16 +317,20 @@ function BanglaField({
       <div ref={inputWrapperRef} className="w-full sm:col-span-2 relative">
         <div className="relative">
           <input
+            ref={inputRef} // Connected ref
             type="text"
             value={value}
             onChange={(e) => handleInputChange(e.target.value)}
-            // REMOVED onFocus triggers entirely so standard text focus is untouched
             className={`${inputStyles} pr-20`}
             placeholder="শুধুমাত্র বাংলায় লিখুন"
           />
           <button
             type="button"
-            onClick={() => setShowKeyboard((p) => !p)}
+            onClick={() => {
+              setShowKeyboard((p) => !p);
+              // Focus immediately upon clicking the button
+              setTimeout(() => inputRef.current?.focus(), 0);
+            }}
             className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs font-bold rounded bg-cyan-600 text-white hover:bg-cyan-700 px-2.5 py-1 transition-all cursor-pointer"
           >
             কীবোর্ড
@@ -323,6 +343,7 @@ function BanglaField({
             onChange={handleInputChange}
             onClose={() => setShowKeyboard(false)}
             anchorRef={inputWrapperRef}
+            inputRef={inputRef} // Passing reference downward
           />
         )}
       </div>
