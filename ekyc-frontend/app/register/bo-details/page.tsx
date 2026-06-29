@@ -124,7 +124,7 @@ export default function BoDetailsPage() {
                                 </label>
                                 <input
                                     type="text"
-                                    placeholder="e.g. Spectrum Securities (DP 300)"
+                                    placeholder="Please enter your depository participant name"
                                     value={formData.dpName}
                                     onChange={(e) => set("dpName", e.target.value)}
                                     className={inStyles}
@@ -135,7 +135,7 @@ export default function BoDetailsPage() {
                                 <label className="text-sm font-medium text-gray-500">TIN Number</label>
                                 <input
                                     type="text"
-                                    placeholder="12-digit TIN"
+                                    placeholder="Please enter your TIN number"
                                     value={formData.tin}
                                     onChange={(e) => set("tin", e.target.value)}
                                     className={`${inStyles} font-mono`}
@@ -157,7 +157,7 @@ export default function BoDetailsPage() {
                                 </label>
                                 <input
                                     type="text"
-                                    placeholder="e.g. Dutch-Bangla Bank PLC"
+                                    placeholder="Please enter your bank name"
                                     value={formData.bankName}
                                     onChange={(e) => set("bankName", e.target.value)}
                                     className={inStyles}
@@ -170,7 +170,7 @@ export default function BoDetailsPage() {
                                 </label>
                                 <input
                                     type="text"
-                                    placeholder="e.g. 117.110.456123"
+                                    placeholder="Please enter your account number"
                                     value={formData.accountNumber}
                                     onChange={(e) => set("accountNumber", e.target.value)}
                                     className={`${inStyles} font-mono`}
