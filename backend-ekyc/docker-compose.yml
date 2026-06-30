@@ -11,6 +11,12 @@ services:
     volumes:
       - ./pgdata_second:/var/lib/postgresql/data
       - ./migrations/init.sql:/docker-entrypoint-initdb.d/init.sql
+    # ─── ADDED HEALTHCHECK ──────────────────────────────────────────
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ekyc"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
 
   mock-apis:
     build:
@@ -40,9 +46,12 @@ services:
       PORT: 5000
       DATABASE_URL: postgres://postgres:sa@postgres_second:5432/ekyc
       NID_OCR_URL: http://mockoon_service:3002/api/v1/nid/info
+    # ─── UPDATED DEPENDS_ON ─────────────────────────────────────────
     depends_on:
-      - postgres_second
-      - mock-apis
+      postgres_second:
+        condition: service_healthy # Wait for DB setup & init.sql to fully finish
+      mock-apis:
+        condition: service_started
 
   frontend_bank:
     image: node:20-alpine
