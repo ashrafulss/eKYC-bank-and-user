@@ -104,7 +104,7 @@ export default function RegisterLayout({ children }: { children: React.ReactNode
     { num: 3, title: "Selfie", subtitle: "Liveness check" },
     { num: 4, title: "Basic Info", subtitle: "Personal details" },
     { num: 5, title: "Nominee", subtitle: "Beneficiary setup" },
-    { num: 6, title: "BO Details", subtitle: "BO Account details" },
+    { num: 6, title: "Account Information", subtitle: "Account Info" },
     { num: 7, title: "Review", subtitle: "Confirm details" },
   ];
 

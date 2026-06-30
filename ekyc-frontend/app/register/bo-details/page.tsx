@@ -90,10 +90,7 @@ export default function BoDetailsPage() {
                 )}
 
                 <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">BO Account Opening</h1>
-                    <p className="text-sm text-gray-500 mt-1">
-                        Fill in your depository participant and bank settlement details to open your Beneficiary Owner account.
-                    </p>
+                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Account Information</h1>
                 </div>
 
                 <div className="space-y-6">
@@ -101,7 +98,7 @@ export default function BoDetailsPage() {
                     {/* ── BO Account Details ── */}
                     <div className="bg-white rounded-xl border border-gray-100 p-6 md:p-8 space-y-4">
                         <h2 className="text-xs font-bold tracking-wider text-cyan-700 uppercase border-b border-gray-100 pb-3">
-                            BO Account Details
+                            Account Type
                         </h2>
 
                         <div className="space-y-4">
