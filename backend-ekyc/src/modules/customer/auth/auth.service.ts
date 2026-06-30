@@ -290,7 +290,7 @@ export class AuthService {
     return {
       id: row.id,
       mobile: row.mobile,
-      name: row.first_name && row.last_name ? `${row.first_name} ${row.last_name}` : "",
+      name: row.first_name  ? `${row.first_name} ${row.last_name}` : "",
       email: row.email || "",
       nid: "", 
       nidFront: row.nid_front || null,
