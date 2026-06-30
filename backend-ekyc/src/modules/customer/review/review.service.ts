@@ -1,7 +1,7 @@
-
 import pool from "../../../config/db.js";
 import type { PrepopulatedProfileDTO } from "../../../types/basic-info.types.js";
 import { reviewRepository } from "./review.repository.js";
+import type { NomineeInput, BoAccountInput } from "./review.repository.js";
 
 export const reviewService = {
 
@@ -43,7 +43,7 @@ export const reviewService = {
           email: app.email || "—",
           mobile: app.mobile || "—",
           presentAddress: presentAddressFormatted,
-          postCode: app.postal_code || "—", // Mapped directly from address table column
+          postCode: app.postal_code || "—",
           occupation: app.occupation || "—",
           employer: app.employer_name || "—",
           monthlyIncome: app.monthly_income || "—",
@@ -79,7 +79,6 @@ export const reviewService = {
     try {
       await client.query("BEGIN");
 
-      // Guard: check if user already submitted
       const currentStep = await reviewRepository.getUserCurrentStep(userId, client);
       if (!currentStep) {
         throw new Error("User not found.");
@@ -88,16 +87,12 @@ export const reviewService = {
         throw new Error("Application already submitted.");
       }
 
-      // Resolve applicationId from userId
       const applicationId = await reviewRepository.getApplicationIdByUserId(userId, client);
       if (!applicationId) {
         throw new Error("No active application found for this customer.");
       }
 
-      // 1. Update applications: status = 'pending', submitted_at = NOW()
       await reviewRepository.markApplicationSubmitted(applicationId, client);
-
-      // 2. Update users: current_step = 'submitted'
       await reviewRepository.advanceUserStepToSubmitted(userId, client);
 
       await client.query("COMMIT");
@@ -109,42 +104,86 @@ export const reviewService = {
     }
   },
 
-
   async saveBasicProfile(userId: string, profileDto: PrepopulatedProfileDTO): Promise<void> {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
+      const appResult = await client.query(
+        `SELECT id FROM public.applications WHERE user_id = $1 LIMIT 1`,
+        [userId]
+      );
+      if (!appResult.rows.length) throw new Error("Application not found.");
+      const applicationId = appResult.rows[0].id;
 
-    const appResult = await client.query(
-      `SELECT id FROM public.applications WHERE user_id = $1 LIMIT 1`,
-      [userId]
-    );
-    if (!appResult.rows.length) throw new Error("Application not found.");
-    const applicationId = appResult.rows[0].id;
-
-await reviewRepository.updatePersonalInfo({
+      await reviewRepository.updatePersonalInfo({
   applicationId,
-  fullNameEnglish:  profileDto.fullNameEnglish,  
+  fullNameEnglish:  profileDto.fullNameEnglish,
   fullNameBangla:   profileDto.fullNameBangla,
   fatherNameBangla: profileDto.fatherNameBangla,
   motherNameBangla: profileDto.motherNameBangla,
-  nidNumber:        profileDto.nidNumber,         
+  spouseName:       profileDto.spouseName,
+  nidNumber:        profileDto.nidNumber,
+  bloodGroup:       profileDto.bloodGroup,
+  birthPlace:       profileDto.birthPlace,
   email:            profileDto.email,
   occupation:       profileDto.occupation,
   employerName:     profileDto.employer,
   monthlyIncome:    profileDto.monthlyIncome,
   presentAddress:   profileDto.presentAddress,
+  postCode:         profileDto.postCode,
 }, client);
 
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
 
+  // 🌟 NEW: Replace nominees for the customer's active application
+  async updateNominees(userId: string, nominees: NomineeInput[]): Promise<void> {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-}
+      const applicationId = await reviewRepository.getApplicationIdByUserId(userId, client);
+      if (!applicationId) {
+        throw new Error("No active application found for this customer.");
+      }
+
+      await reviewRepository.replaceNominees(applicationId, nominees, client);
+
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
+
+  // 🌟 NEW: Upsert BO account / trading settlement preferences
+  async updateBoAccount(userId: string, boData: BoAccountInput): Promise<void> {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const applicationId = await reviewRepository.getApplicationIdByUserId(userId, client);
+      if (!applicationId) {
+        throw new Error("No active application found for this customer.");
+      }
+
+      await reviewRepository.upsertBoAccount(applicationId, boData, client);
+
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
 };

@@ -36,7 +36,6 @@ export const submitApplication = asyncHandler(async (req: Request, res: Response
   ApiResponse.ok(res, null, "Application submitted successfully. Awaiting bank approval.");
 });
 
-
 export const saveBasicInfoProfile = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.customer?.id; 
   if (!userId) {
@@ -50,4 +49,33 @@ export const saveBasicInfoProfile = asyncHandler(async (req: Request, res: Respo
     null,
     "Basic user registration additions preserved and step advanced successfully."
   );
+});
+
+// 🌟 NEW: Update nominees
+export const updateNominees = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.customer?.id;
+  if (!userId) {
+    throw new UnauthorizedError("Unauthorized profile context session missing.");
+  }
+
+  const { nominees } = req.body;
+  if (!Array.isArray(nominees)) {
+    throw new BadRequestError("Request body must include a 'nominees' array.");
+  }
+
+  await reviewService.updateNominees(userId, nominees);
+
+  ApiResponse.ok(res, null, "Nominee information updated successfully.");
+});
+
+// 🌟 NEW: Update BO account / trading settlement preferences
+export const updateBoAccount = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.customer?.id;
+  if (!userId) {
+    throw new UnauthorizedError("Unauthorized profile context session missing.");
+  }
+
+  await reviewService.updateBoAccount(userId, req.body);
+
+  ApiResponse.ok(res, null, "BO account settlement details updated successfully.");
 });

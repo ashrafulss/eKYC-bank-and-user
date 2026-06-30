@@ -1,6 +1,32 @@
-
 import type { PoolClient } from "pg";
 import type { UpdatePersonalInfoInput } from "../basic-info/basic-info.repository.js";
+
+export interface NomineeInput {
+  name: string;
+  relationship: string;
+  nid: string;
+  dob: string;
+  share: string;
+  contact: string;
+}
+
+export interface BoAccountInput {
+  accountType: string;
+  dp: string;
+  bank: string;
+  settlementAccount: string;
+  tin: string;
+  cash: boolean;
+  margin: boolean;
+  foreign: boolean;
+}
+
+const parseSharePercent = (share: string): number | null => {
+  if (!share) return null;
+  const cleaned = share.replace("%", "").trim();
+  const parsed = parseFloat(cleaned);
+  return isNaN(parsed) ? null : parsed;
+};
 
 export const reviewRepository = {
 
@@ -74,7 +100,6 @@ export const reviewRepository = {
     };
   },
 
-  // Resolve applicationId from userId
   async getApplicationIdByUserId(userId: string, client: PoolClient): Promise<string | null> {
     const result = await client.query(
       `SELECT id FROM public.applications WHERE user_id = $1 LIMIT 1`,
@@ -83,7 +108,6 @@ export const reviewRepository = {
     return result.rows[0]?.id ?? null;
   },
 
-  // Check current_step on users table — guard against double submission
   async getUserCurrentStep(userId: string, client: PoolClient): Promise<string | null> {
     const result = await client.query(
       `SELECT current_step FROM public.users WHERE id = $1`,
@@ -92,8 +116,6 @@ export const reviewRepository = {
     return result.rows[0]?.current_step ?? null;
   },
 
-  // 1. Mark application as pending (visible to bank admin maker/checker)
-  // 2. Update submitted_at to actual submission time
   async markApplicationSubmitted(applicationId: string, client: PoolClient): Promise<void> {
     await client.query(
       `UPDATE public.applications
@@ -105,7 +127,6 @@ export const reviewRepository = {
     );
   },
 
-  // Advance user wizard step to 'submitted' — final step in registration_step ENUM
   async advanceUserStepToSubmitted(userId: string, client: PoolClient): Promise<void> {
     await client.query(
       `UPDATE public.users
@@ -116,52 +137,116 @@ export const reviewRepository = {
     );
   },
 
-
-    async updatePersonalInfo(input: UpdatePersonalInfoInput, client: PoolClient): Promise<void> {
-      // 1. Update personal data fields
-      await client.query(
+async updatePersonalInfo(input: UpdatePersonalInfoInput, client: PoolClient): Promise<void> {
+  await client.query(
     `UPDATE public.personal_info 
      SET 
        first_name         = $1,
-       full_name_bangla   = $2,
-       father_name_bangla = $3,
-       mother_name_bangla = $4,
-       nid_number         = $5,
-       email              = $6,
-       occupation         = $7,
-       employer_name      = $8,
-       monthly_income     = $9,
+       last_name           = $2,
+       full_name_bangla   = $3,
+       father_name_bangla = $4,
+       mother_name_bangla = $5,
+       spouse_name        = $6,
+       nid_number         = $7,
+       blood_group        = $8,
+       birth_place        = $9,
+       email              = $10,
+       occupation         = $11,
+       employer_name      = $12,
+       monthly_income     = $13,
        updated_at         = NOW() 
-     WHERE application_id = $10`,
+     WHERE application_id = $14`,
     [
-      input.fullNameEnglish,   // $1  → first_name (full english name)
-      input.fullNameBangla,    // $2
-      input.fatherNameBangla,  // $3
-      input.motherNameBangla,  // $4
-      input.nidNumber,         // $5
-      input.email,             // $6
-      input.occupation,        // $7
-      input.employerName,      // $8
-      input.monthlyIncome,     // $9
-      input.applicationId,     // $10
+      input.fullNameEnglish ?? null,
+      "",                           // last_name: NOT NULL — kept empty since we store full name in first_name
+      input.fullNameBangla ?? null,
+      input.fatherNameBangla ?? null,
+      input.motherNameBangla ?? null,
+      input.spouseName ?? null,
+      input.nidNumber ?? null,
+      input.bloodGroup ?? null,
+      input.birthPlace ?? null,
+      input.email ?? null,
+      input.occupation ?? null,
+      input.employerName ?? null,
+      input.monthlyIncome ?? null,
+      input.applicationId,
     ]
   );
-  
-      // 2. 🌟 FIXED: Upserts the customized address directly to the address_line1 column
-      await client.query(
+
+  await client.query(
     `INSERT INTO public.address_info (
       application_id, 
       address_line1, 
+      postal_code,
       district, 
       division, 
       updated_at
      )
-     VALUES ($1, $2, 'Unknown', 'Unknown', NOW())
+     VALUES ($1, $2, $3, 'Unknown', 'Unknown', NOW())
      ON CONFLICT (application_id)
      DO UPDATE SET 
        address_line1 = EXCLUDED.address_line1, 
-       updated_at = NOW();`,
-    [input.applicationId, input.presentAddress]
-  );;
-    },
+       postal_code   = EXCLUDED.postal_code,
+       updated_at    = NOW();`,
+    [input.applicationId, input.presentAddress ?? null, input.postCode ?? null]
+  );
+},
+
+  // 🌟 NEW: Replace all nominees for an application (delete + reinsert)
+  async replaceNominees(applicationId: string, nominees: NomineeInput[], client: PoolClient): Promise<void> {
+    await client.query(
+      `DELETE FROM public.nominees WHERE application_id = $1`,
+      [applicationId]
+    );
+
+    for (const nominee of nominees) {
+      await client.query(
+        `INSERT INTO public.nominees (
+          application_id, name, relationship, nid_passport, date_of_birth, share_percent, contact, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+        [
+          applicationId,
+          nominee.name || null,
+          nominee.relationship || null,
+          nominee.nid || null,
+          nominee.dob || null,
+          parseSharePercent(nominee.share),
+          nominee.contact || null,
+        ]
+      );
+    }
+  },
+
+  // 🌟 NEW: Upsert BO account / trading settlement preferences
+  async upsertBoAccount(applicationId: string, bo: BoAccountInput, client: PoolClient): Promise<void> {
+    await client.query(
+      `INSERT INTO public.bo_accounts (
+        application_id, account_type, depository_participant, bank_name, settlement_account, tin_number,
+        permission_cash, permission_margin, permission_foreign, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+      ON CONFLICT (application_id)
+      DO UPDATE SET
+        account_type           = EXCLUDED.account_type,
+        depository_participant = EXCLUDED.depository_participant,
+        bank_name               = EXCLUDED.bank_name,
+        settlement_account      = EXCLUDED.settlement_account,
+        tin_number               = EXCLUDED.tin_number,
+        permission_cash          = EXCLUDED.permission_cash,
+        permission_margin        = EXCLUDED.permission_margin,
+        permission_foreign       = EXCLUDED.permission_foreign,
+        updated_at               = NOW();`,
+      [
+        applicationId,
+        bo.accountType || null,
+        bo.dp || null,
+        bo.bank || null,
+        bo.settlementAccount || null,
+        bo.tin || null,
+        bo.cash ?? false,
+        bo.margin ?? false,
+        bo.foreign ?? false,
+      ]
+    );
+  },
 };

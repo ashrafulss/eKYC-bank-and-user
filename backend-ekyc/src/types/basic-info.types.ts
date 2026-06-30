@@ -13,4 +13,9 @@ export interface PrepopulatedProfileDTO {
   occupation: string;
   employer: string;
   monthlyIncome: string;
+  spouseName?: string;
+  postCode?: string;
+  birthPlace?: string;
+  bloodGroup?: string;
+  
 }

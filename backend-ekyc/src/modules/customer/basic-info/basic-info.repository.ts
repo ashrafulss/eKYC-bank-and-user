@@ -1,17 +1,21 @@
 import type { PoolClient } from "pg";
 
 export interface UpdatePersonalInfoInput {
-  applicationId:    string;
-  fullNameEnglish:  string;   // ← add
-  fullNameBangla:   string;
-  fatherNameBangla: string;
-  motherNameBangla: string;
-  nidNumber:        string;   // ← add
-  email:            string;
-  occupation:       string;
-  employerName:     string;
-  monthlyIncome:    string;
-  presentAddress:   string;
+  applicationId: string;
+  fullNameEnglish?: string | undefined;
+  fullNameBangla?: string | undefined;
+  fatherNameBangla?: string | undefined;
+  motherNameBangla?: string | undefined;
+  spouseName?: string | undefined;
+  nidNumber?: string | undefined;
+  bloodGroup?: string | undefined;
+  birthPlace?: string | undefined;
+  email?: string | undefined;
+  occupation?: string | undefined;
+  employerName?: string | undefined;
+  monthlyIncome?: string | undefined;
+  presentAddress?: string | undefined;
+  postCode?: string | undefined;
 }
 
 export const basicInfoRepository = {
