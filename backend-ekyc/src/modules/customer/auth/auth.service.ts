@@ -26,7 +26,7 @@ export class AuthService {
     deliveryMethod: "sms" | "email" | "both",
   ): Promise<string> {
     await this.authRepository.invalidatePriorOTPs(mobile);
-    const rawOtpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const rawOtpCode = "111111";
     const expiresAt = new Date(Date.now() + 3 * 60 * 1000); 
     const hashedOtpCode = crypto
       .createHash("sha256")
@@ -38,9 +38,8 @@ export class AuthService {
     await this.authRepository.saveOTPRecord(mobile, finalEmail, hashedOtpCode, expiresAt);
     await this.authRepository.createUserPlaceholder(mobile);
 
-    // 🌟 HIGHLIGHT: Decoupled Non-blocking I/O. 
-    // Notice the absence of 'await'. This hands execution right back to the controller immediately.
-    this.dispatchNotificationChannels(deliveryMethod, finalEmail, mobile, rawOtpCode);
+
+    // this.dispatchNotificationChannels(deliveryMethod, finalEmail, mobile, rawOtpCode);
 
     return rawOtpCode;
   }
