@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { reviewApplicationService } from "@/app/services/review.service";
+import { useAuth } from "@/app/context/auth-context";
+
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -157,6 +159,7 @@ export default function Review() {
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   // ── Basic Info ──────────────────────────────────────────────────────────────
   const [isEditingBasic, setIsEditingBasic] = useState(false);
@@ -278,11 +281,16 @@ export default function Review() {
         fullNameBangla: editBasic.fullNameBangla,
         fatherNameBangla: editBasic.fatherNameBangla,
         motherNameBangla: editBasic.motherNameBangla,
+        spouseName: editBasic.spouseName,
+        nidNumber: editBasic.nidNumber,
+        bloodGroup: editBasic.bloodGroup,
+        birthPlace: editBasic.birthPlace,
         email: editBasic.email,
         occupation: editBasic.occupation,
         employer: editBasic.employer,
         monthlyIncome: editBasic.monthlyIncome,
         presentAddress: editBasic.presentAddress,
+        postCode: editBasic.postCode,
       });
       setIsEditingBasic(false);
       await fetchReviewData();
@@ -538,13 +546,12 @@ export default function Review() {
                 </div>
                 <div>
                   <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Phone Number</span>
-                  {isEditingBasic ? (
-                    <input type="tel" value={editBasic.phoneNumber}
-                      onChange={(e) => setEditBasic({ ...editBasic, phoneNumber: e.target.value })}
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    />
-                  ) : <ReadField value={userData?.personal.phoneNumber} />}
+                  <div className="w-full px-3 py-1.5 bg-slate-100/70 border border-gray-200 rounded-md text-sm text-gray-500 select-none">
+                    {user?.mobile + " " + user?.name || "—"}
+                    <span className="text-[10px] ml-1 text-gray-400">(Verified)</span>
+                  </div>
                 </div>
+
               </div>
             </div>
 

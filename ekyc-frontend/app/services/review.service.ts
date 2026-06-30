@@ -50,11 +50,16 @@ export interface UpdateBasicProfilePayload {
   fullNameBangla?: string;
   fatherNameBangla?: string;
   motherNameBangla?: string;
+  spouseName?: string;
+  nidNumber?: string;
+  bloodGroup?: string;
+  birthPlace?: string;
   email?: string;
   occupation?: string;
   employer?: string;
   monthlyIncome?: string;
   presentAddress?: string;
+  postCode?: string;
 }
 
 export interface UpdateNomineesPayload {
@@ -92,11 +97,11 @@ export const reviewApplicationService = {
 
 
   async updateNominees(payload: UpdateNomineesPayload): Promise<void> {
-    await apiClient.post("/nominees/update-all", payload); 
+    await apiClient.put("/nominees/update-all", payload); 
   },
 
   async updateBoAccounts(payload: UpdateBoAccountsPayload): Promise<void> {
-    await apiClient.post("/bo-account/save", payload);
+    await apiClient.put("/bo-account/save", payload);
   },
 
   async submitApplication(): Promise<void> {
