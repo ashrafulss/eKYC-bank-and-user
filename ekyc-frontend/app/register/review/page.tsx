@@ -162,24 +162,25 @@ export default function Review() {
   const [isEditingBasic, setIsEditingBasic] = useState(false);
   const [isSavingBasic, setIsSavingBasic] = useState(false);
   const [basicError, setBasicError] = useState<string | null>(null);
-const [editBasic, setEditBasic] = useState({
-  applicationId: "",
-  fullNameBangla: "",
-  dateOfBirth: "",          
-  fatherNameBangla: "",
-  motherNameBangla: "",
-  spouseName: "",           
-  nidNumber: "",            
-  bloodGroup: "",           
-  birthPlace: "",           
-  email: "",
-  phoneNumber: "",          
-  presentAddress: "",
-  postCode: "",             
-  occupation: "",
-  employer: "",
-  monthlyIncome: "",
-});
+  const [editBasic, setEditBasic] = useState({
+    applicationId: "",
+    fullNameEnglish: "",
+    fullNameBangla: "",
+    dob: "",
+    fatherNameBangla: "",
+    motherNameBangla: "",
+    spouseName: "",
+    nidNumber: "",
+    bloodGroup: "",
+    birthPlace: "",
+    email: "",
+    phoneNumber: "",
+    presentAddress: "",
+    postCode: "",
+    occupation: "",
+    employer: "",
+    monthlyIncome: "",
+  });
 
   // ── Nominees ────────────────────────────────────────────────────────────────
   const [isEditingNominees, setIsEditingNominees] = useState(false);
@@ -218,24 +219,25 @@ const [editBasic, setEditBasic] = useState({
       const data = await reviewApplicationService.getSummary();
       setUserData(data);
 
-setEditBasic({
-  applicationId: data.personal.applicationId || "",
-  fullNameBangla: data.personal.fullNameBangla || "",
-  dateOfBirth: data.personal.dateOfBirth || "",
-  fatherNameBangla: data.personal.fatherNameBangla || "",
-  motherNameBangla: data.personal.motherNameBangla || "",
-  spouseName: data.personal.spouseName || "",
-  nidNumber: data.personal.nidNumber || "",
-  bloodGroup: data.personal.bloodGroup || "",
-  birthPlace: data.personal.birthPlace || "",
-  email: data.personal.email || "",
-  phoneNumber: data.personal.phoneNumber || "",
-  presentAddress: data.personal.presentAddress || "",
-  postCode: data.personal.postCode || "",
-  occupation: data.personal.occupation || "",
-  employer: data.personal.employer || "",
-  monthlyIncome: data.personal.monthlyIncome || "",
-});
+      setEditBasic({
+        applicationId: data.personal.applicationId || "",
+        fullNameEnglish: data.personal.fullNameEnglish || "",
+        fullNameBangla: data.personal.fullNameBangla || "",
+        dob: data.personal.dob || "",
+        fatherNameBangla: data.personal.fatherNameBangla || "",
+        motherNameBangla: data.personal.motherNameBangla || "",
+        spouseName: data.personal.spouseName || "",
+        nidNumber: data.personal.nidNumber || "",
+        bloodGroup: data.personal.bloodGroup || "",
+        birthPlace: data.personal.birthPlace || "",
+        email: data.personal.email || "",
+        phoneNumber: data.personal.phoneNumber || "",
+        presentAddress: data.personal.presentAddress || "",
+        postCode: data.personal.postCode || "",
+        occupation: data.personal.occupation || "",
+        employer: data.personal.employer || "",
+        monthlyIncome: data.personal.monthlyIncome || "",
+      });
 
       setEditNominees(
         (data.nominees || []).map((n: any) => ({
@@ -272,6 +274,7 @@ setEditBasic({
       setIsSavingBasic(true);
       setBasicError(null);
       await reviewApplicationService.updateBasicProfile({
+        fullNameEnglish: editBasic.fullNameEnglish,
         fullNameBangla: editBasic.fullNameBangla,
         fatherNameBangla: editBasic.fatherNameBangla,
         motherNameBangla: editBasic.motherNameBangla,
@@ -397,220 +400,224 @@ setEditBasic({
           />
           <InlineError message={basicError} />
 
-<div className="space-y-4">
+          <div className="space-y-4">
 
-  {/* Name English — locked */}
-  <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-    <span className="text-sm font-medium text-gray-500">Name (English)</span>
-    <div className="w-full sm:col-span-2 px-3 py-2 bg-slate-100/70 border border-gray-200 rounded-md text-sm text-gray-500 select-none">
-      {userData?.personal.fullNameEnglish}
-      <span className="text-[10px] ml-1 text-gray-400">(Verified from NID)</span>
-    </div>
-  </div>
+            {/* Name English — editable */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
+              <span className="text-sm font-medium text-gray-500">Name (English)</span>
+              <div className="w-full sm:col-span-2">
+                {isEditingBasic ? (
+                  <input type="text" value={editBasic.fullNameEnglish}
+                    onChange={(e) => setEditBasic({ ...editBasic, fullNameEnglish: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                ) : <ReadField value={userData?.personal.fullNameEnglish} />}
+              </div>
+            </div>
 
-  {/* Name Bangla + Date of Birth */}
-  <div className="grid grid-cols-1 sm:grid-cols-3 items-start gap-2">
-    <span className="text-sm font-medium text-gray-500 pt-2">Name & Birth</span>
-    <div className="w-full sm:col-span-2 grid grid-cols-2 gap-2">
-      <div>
-        <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Name (Bangla)</span>
-        {isEditingBasic ? (
-          <input type="text" value={editBasic.fullNameBangla}
-            onChange={(e) => setEditBasic({ ...editBasic, fullNameBangla: e.target.value })}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-          />
-        ) : <ReadField value={userData?.personal.fullNameBangla} />}
-      </div>
-      <div>
-        <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Date of Birth</span>
-        {isEditingBasic ? (
-          <input type="date" value={editBasic.dateOfBirth}
-            onChange={(e) => setEditBasic({ ...editBasic, dateOfBirth: e.target.value })}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-          />
-        ) : <ReadField value={userData?.personal.dateOfBirth} />}
-      </div>
-    </div>
-  </div>
+            {/* Name Bangla + Date of Birth */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 items-start gap-2">
+              <span className="text-sm font-medium text-gray-500 pt-2">Name & Birth</span>
+              <div className="w-full sm:col-span-2 grid grid-cols-2 gap-2">
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Name (Bangla)</span>
+                  {isEditingBasic ? (
+                    <input type="text" value={editBasic.fullNameBangla}
+                      onChange={(e) => setEditBasic({ ...editBasic, fullNameBangla: e.target.value })}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  ) : <ReadField value={userData?.personal.fullNameBangla} />}
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Date of Birth</span>
+                  {isEditingBasic ? (
+                    <input type="date" value={editBasic.dob}
+                      onChange={(e) => setEditBasic({ ...editBasic, dob: e.target.value })}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  ) : <ReadField value={userData?.personal.dob} />}
+                </div>
+              </div>
+            </div>
 
-  {/* Father / Mother */}
-  <div className="grid grid-cols-1 sm:grid-cols-3 items-start gap-2">
-    <span className="text-sm font-medium text-gray-500 pt-2">Family Info (Bangla)</span>
-    <div className="w-full sm:col-span-2 grid grid-cols-2 gap-2">
-      <div>
-        <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Father's Name</span>
-        {isEditingBasic ? (
-          <input type="text" value={editBasic.fatherNameBangla}
-            onChange={(e) => setEditBasic({ ...editBasic, fatherNameBangla: e.target.value })}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-          />
-        ) : <ReadField value={userData?.personal.fatherNameBangla} />}
-      </div>
-      <div>
-        <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Mother's Name</span>
-        {isEditingBasic ? (
-          <input type="text" value={editBasic.motherNameBangla}
-            onChange={(e) => setEditBasic({ ...editBasic, motherNameBangla: e.target.value })}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-          />
-        ) : <ReadField value={userData?.personal.motherNameBangla} />}
-      </div>
-    </div>
-  </div>
+            {/* Father / Mother */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 items-start gap-2">
+              <span className="text-sm font-medium text-gray-500 pt-2">Family Info (Bangla)</span>
+              <div className="w-full sm:col-span-2 grid grid-cols-2 gap-2">
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Father's Name</span>
+                  {isEditingBasic ? (
+                    <input type="text" value={editBasic.fatherNameBangla}
+                      onChange={(e) => setEditBasic({ ...editBasic, fatherNameBangla: e.target.value })}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  ) : <ReadField value={userData?.personal.fatherNameBangla} />}
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Mother's Name</span>
+                  {isEditingBasic ? (
+                    <input type="text" value={editBasic.motherNameBangla}
+                      onChange={(e) => setEditBasic({ ...editBasic, motherNameBangla: e.target.value })}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  ) : <ReadField value={userData?.personal.motherNameBangla} />}
+                </div>
+              </div>
+            </div>
 
-  {/* Spouse */}
-  <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-    <span className="text-sm font-medium text-gray-500">Spouse Name</span>
-    <div className="w-full sm:col-span-2">
-      {isEditingBasic ? (
-        <input type="text" value={editBasic.spouseName}
-          onChange={(e) => setEditBasic({ ...editBasic, spouseName: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-        />
-      ) : <ReadField value={userData?.personal.spouseName} />}
-    </div>
-  </div>
+            {/* Spouse */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
+              <span className="text-sm font-medium text-gray-500">Spouse Name</span>
+              <div className="w-full sm:col-span-2">
+                {isEditingBasic ? (
+                  <input type="text" value={editBasic.spouseName}
+                    onChange={(e) => setEditBasic({ ...editBasic, spouseName: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                ) : <ReadField value={userData?.personal.spouseName} />}
+              </div>
+            </div>
 
-  <hr className="border-dashed border-gray-100" />
+            <hr className="border-dashed border-gray-100" />
 
-  {/* NID + Blood Group + Birth Place */}
-  <div className="grid grid-cols-1 sm:grid-cols-3 items-start gap-2">
-    <span className="text-sm font-medium text-gray-500 pt-2">Identity & Medical</span>
-    <div className="w-full sm:col-span-2 grid grid-cols-3 gap-2">
-      <div>
-        <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">NID Number</span>
-        {isEditingBasic ? (
-          <input type="text" value={editBasic.nidNumber}
-            onChange={(e) => setEditBasic({ ...editBasic, nidNumber: e.target.value })}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-          />
-        ) : (
-          <div className="w-full px-3 py-2 bg-slate-50 border border-gray-100 rounded-md text-sm font-mono text-gray-800">
-            {userData?.personal.nidNumber || "—"}
+            {/* NID + Blood Group + Birth Place */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 items-start gap-2">
+              <span className="text-sm font-medium text-gray-500 pt-2">Identity & Medical</span>
+              <div className="w-full sm:col-span-2 grid grid-cols-3 gap-2">
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">NID Number</span>
+                  {isEditingBasic ? (
+                    <input type="text" value={editBasic.nidNumber}
+                      onChange={(e) => setEditBasic({ ...editBasic, nidNumber: e.target.value })}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  ) : (
+                    <div className="w-full px-3 py-2 bg-slate-50 border border-gray-100 rounded-md text-sm font-mono text-gray-800">
+                      {userData?.personal.nidNumber || "—"}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Blood Group</span>
+                  {isEditingBasic ? (
+                    <select value={editBasic.bloodGroup}
+                      onChange={(e) => setEditBasic({ ...editBasic, bloodGroup: e.target.value })}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    >
+                      <option value="">Select</option>
+                      {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(g => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
+                  ) : <ReadField value={userData?.personal.bloodGroup} />}
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Birth Place</span>
+                  {isEditingBasic ? (
+                    <input type="text" value={editBasic.birthPlace}
+                      onChange={(e) => setEditBasic({ ...editBasic, birthPlace: e.target.value })}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  ) : <ReadField value={userData?.personal.birthPlace} />}
+                </div>
+              </div>
+            </div>
+
+            {/* Email + Phone */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 items-start gap-2">
+              <span className="text-sm font-medium text-gray-500 pt-2">Contact Details</span>
+              <div className="w-full sm:col-span-2 grid grid-cols-2 gap-2">
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Email Address</span>
+                  {isEditingBasic ? (
+                    <input type="email" value={editBasic.email}
+                      onChange={(e) => setEditBasic({ ...editBasic, email: e.target.value })}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  ) : <ReadField value={userData?.personal.email} />}
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Phone Number</span>
+                  {isEditingBasic ? (
+                    <input type="tel" value={editBasic.phoneNumber}
+                      onChange={(e) => setEditBasic({ ...editBasic, phoneNumber: e.target.value })}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  ) : <ReadField value={userData?.personal.phoneNumber} />}
+                </div>
+              </div>
+            </div>
+
+            {/* Address + Post Code */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 items-start gap-2">
+              <span className="text-sm font-medium text-gray-500 pt-2">Mailing Address</span>
+              <div className="w-full sm:col-span-2 grid grid-cols-3 gap-2">
+                <div className="col-span-2">
+                  <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Present Address</span>
+                  {isEditingBasic ? (
+                    <textarea rows={2} value={editBasic.presentAddress}
+                      onChange={(e) => setEditBasic({ ...editBasic, presentAddress: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  ) : <ReadField value={userData?.personal.presentAddress} />}
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Post Code</span>
+                  {isEditingBasic ? (
+                    <input type="text" value={editBasic.postCode}
+                      onChange={(e) => setEditBasic({ ...editBasic, postCode: e.target.value })}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  ) : <ReadField value={userData?.personal.postCode} />}
+                </div>
+              </div>
+            </div>
+
+            <hr className="border-dashed border-gray-100" />
+
+            {/* Occupation + Employer */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 items-start gap-2">
+              <span className="text-sm font-medium text-gray-500 pt-2">Professional Setup</span>
+              <div className="w-full sm:col-span-2 grid grid-cols-2 gap-2">
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Occupation</span>
+                  {isEditingBasic ? (
+                    <input type="text" value={editBasic.occupation}
+                      onChange={(e) => setEditBasic({ ...editBasic, occupation: e.target.value })}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                    />
+                  ) : <ReadField value={userData?.personal.occupation} />}
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Employer</span>
+                  {isEditingBasic ? (
+                    <input type="text" value={editBasic.employer}
+                      onChange={(e) => setEditBasic({ ...editBasic, employer: e.target.value })}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                    />
+                  ) : <ReadField value={userData?.personal.employer} />}
+                </div>
+              </div>
+            </div>
+
+            {/* Monthly Income */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
+              <span className="text-sm font-medium text-gray-500">Monthly Income</span>
+              <div className="w-full sm:col-span-2">
+                {isEditingBasic ? (
+                  <select value={editBasic.monthlyIncome}
+                    onChange={(e) => setEditBasic({ ...editBasic, monthlyIncome: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
+                  >
+                    <option value="Below BDT 50,000">Below BDT 50,000</option>
+                    <option value="BDT 50,000 - BDT 1,000,000">BDT 50,000 – BDT 1,000,000</option>
+                    <option value="Above BDT 1,000,000">Above BDT 1,000,000</option>
+                  </select>
+                ) : <ReadField value={userData?.personal.monthlyIncome} />}
+              </div>
+            </div>
+
           </div>
-        )}
-      </div>
-      <div>
-        <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Blood Group</span>
-        {isEditingBasic ? (
-          <select value={editBasic.bloodGroup}
-            onChange={(e) => setEditBasic({ ...editBasic, bloodGroup: e.target.value })}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-          >
-            <option value="">Select</option>
-            {["A+","A-","B+","B-","AB+","AB-","O+","O-"].map(g => (
-              <option key={g} value={g}>{g}</option>
-            ))}
-          </select>
-        ) : <ReadField value={userData?.personal.bloodGroup} />}
-      </div>
-      <div>
-        <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Birth Place</span>
-        {isEditingBasic ? (
-          <input type="text" value={editBasic.birthPlace}
-            onChange={(e) => setEditBasic({ ...editBasic, birthPlace: e.target.value })}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-          />
-        ) : <ReadField value={userData?.personal.birthPlace} />}
-      </div>
-    </div>
-  </div>
-
-  {/* Email + Phone */}
-  <div className="grid grid-cols-1 sm:grid-cols-3 items-start gap-2">
-    <span className="text-sm font-medium text-gray-500 pt-2">Contact Details</span>
-    <div className="w-full sm:col-span-2 grid grid-cols-2 gap-2">
-      <div>
-        <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Email Address</span>
-        {isEditingBasic ? (
-          <input type="email" value={editBasic.email}
-            onChange={(e) => setEditBasic({ ...editBasic, email: e.target.value })}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-          />
-        ) : <ReadField value={userData?.personal.email} />}
-      </div>
-      <div>
-        <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Phone Number</span>
-        {isEditingBasic ? (
-          <input type="tel" value={editBasic.phoneNumber}
-            onChange={(e) => setEditBasic({ ...editBasic, phoneNumber: e.target.value })}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-          />
-        ) : <ReadField value={userData?.personal.phoneNumber} />}
-      </div>
-    </div>
-  </div>
-
-  {/* Address + Post Code */}
-  <div className="grid grid-cols-1 sm:grid-cols-3 items-start gap-2">
-    <span className="text-sm font-medium text-gray-500 pt-2">Mailing Address</span>
-    <div className="w-full sm:col-span-2 grid grid-cols-3 gap-2">
-      <div className="col-span-2">
-        <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Present Address</span>
-        {isEditingBasic ? (
-          <textarea rows={2} value={editBasic.presentAddress}
-            onChange={(e) => setEditBasic({ ...editBasic, presentAddress: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-          />
-        ) : <ReadField value={userData?.personal.presentAddress} />}
-      </div>
-      <div>
-        <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Post Code</span>
-        {isEditingBasic ? (
-          <input type="text" value={editBasic.postCode}
-            onChange={(e) => setEditBasic({ ...editBasic, postCode: e.target.value })}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-          />
-        ) : <ReadField value={userData?.personal.postCode} />}
-      </div>
-    </div>
-  </div>
-
-  <hr className="border-dashed border-gray-100" />
-
-  {/* Occupation + Employer */}
-  <div className="grid grid-cols-1 sm:grid-cols-3 items-start gap-2">
-    <span className="text-sm font-medium text-gray-500 pt-2">Professional Setup</span>
-    <div className="w-full sm:col-span-2 grid grid-cols-2 gap-2">
-      <div>
-        <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Occupation</span>
-        {isEditingBasic ? (
-          <input type="text" value={editBasic.occupation}
-            onChange={(e) => setEditBasic({ ...editBasic, occupation: e.target.value })}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
-          />
-        ) : <ReadField value={userData?.personal.occupation} />}
-      </div>
-      <div>
-        <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Employer</span>
-        {isEditingBasic ? (
-          <input type="text" value={editBasic.employer}
-            onChange={(e) => setEditBasic({ ...editBasic, employer: e.target.value })}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
-          />
-        ) : <ReadField value={userData?.personal.employer} />}
-      </div>
-    </div>
-  </div>
-
-  {/* Monthly Income */}
-  <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-    <span className="text-sm font-medium text-gray-500">Monthly Income</span>
-    <div className="w-full sm:col-span-2">
-      {isEditingBasic ? (
-        <select value={editBasic.monthlyIncome}
-          onChange={(e) => setEditBasic({ ...editBasic, monthlyIncome: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
-        >
-          <option value="Below BDT 50,000">Below BDT 50,000</option>
-          <option value="BDT 50,000 - BDT 1,000,000">BDT 50,000 – BDT 1,000,000</option>
-          <option value="Above BDT 1,000,000">Above BDT 1,000,000</option>
-        </select>
-      ) : <ReadField value={userData?.personal.monthlyIncome} />}
-    </div>
-  </div>
-
-</div>
         </div>
 
         {/* ═══ 2. NOMINEES ═════════════════════════════════════════════════ */}
@@ -628,9 +635,8 @@ setEditBasic({
           <div className="space-y-6">
             {editNominees.map((nominee, index) => (
               <div key={index}
-                className={`rounded-lg border p-4 space-y-4 ${
-                  isEditingNominees ? "border-blue-200 bg-blue-50/30" : "border-gray-100 bg-slate-50/40"
-                }`}
+                className={`rounded-lg border p-4 space-y-4 ${isEditingNominees ? "border-blue-200 bg-blue-50/30" : "border-gray-100 bg-slate-50/40"
+                  }`}
               >
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold tracking-wider text-cyan-700 uppercase">
@@ -817,11 +823,10 @@ setEditBasic({
                       { label: "Foreign Market", active: userData?.permissions?.foreign },
                     ].map(({ label, active }) => (
                       <span key={label}
-                        className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
-                          active
-                            ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                            : "bg-slate-100 border-gray-200 text-gray-400"
-                        }`}
+                        className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${active
+                          ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                          : "bg-slate-100 border-gray-200 text-gray-400"
+                          }`}
                       >
                         {active ? "✓" : "✗"} {label}
                       </span>
@@ -865,22 +870,13 @@ setEditBasic({
 
         {/* ═══ ACTION BUTTONS ══════════════════════════════════════════════ */}
         <div className="w-full flex justify-end gap-4 border-t border-slate-200/60 pt-6">
-          {/* <button
-            onClick={() => router.back()}
-            disabled={anyEditing || isSubmitting}
-            className="bg-gray-500 text-white px-8 py-3 rounded cursor-pointer transition-colors hover:bg-gray-600 disabled:opacity-50"
-          >
-            Back
-          </button> */}
-
           <button
             disabled={!agreed || anyEditing || isSubmitting}
             onClick={handleSubmit}
-            className={`px-10 py-3 rounded text-white font-semibold transition-all flex items-center gap-2 ${
-              agreed && !anyEditing && !isSubmitting
-                ? "bg-blue-600 hover:bg-blue-700 cursor-pointer"
-                : "bg-blue-300 cursor-not-allowed"
-            }`}
+            className={`px-10 py-3 rounded text-white font-semibold transition-all flex items-center gap-2 ${agreed && !anyEditing && !isSubmitting
+              ? "bg-blue-600 hover:bg-blue-700 cursor-pointer"
+              : "bg-blue-300 cursor-not-allowed"
+              }`}
           >
             {isSubmitting && (
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

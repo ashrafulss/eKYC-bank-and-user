@@ -1,5 +1,6 @@
 
 import type { PoolClient } from "pg";
+import type { UpdatePersonalInfoInput } from "../basic-info/basic-info.repository.js";
 
 export const reviewRepository = {
 
@@ -113,5 +114,54 @@ export const reviewRepository = {
        WHERE id = $1`,
       [userId]
     );
-  }
+  },
+
+
+    async updatePersonalInfo(input: UpdatePersonalInfoInput, client: PoolClient): Promise<void> {
+      // 1. Update personal data fields
+      await client.query(
+    `UPDATE public.personal_info 
+     SET 
+       first_name         = $1,
+       full_name_bangla   = $2,
+       father_name_bangla = $3,
+       mother_name_bangla = $4,
+       nid_number         = $5,
+       email              = $6,
+       occupation         = $7,
+       employer_name      = $8,
+       monthly_income     = $9,
+       updated_at         = NOW() 
+     WHERE application_id = $10`,
+    [
+      input.fullNameEnglish,   // $1  → first_name (full english name)
+      input.fullNameBangla,    // $2
+      input.fatherNameBangla,  // $3
+      input.motherNameBangla,  // $4
+      input.nidNumber,         // $5
+      input.email,             // $6
+      input.occupation,        // $7
+      input.employerName,      // $8
+      input.monthlyIncome,     // $9
+      input.applicationId,     // $10
+    ]
+  );
+  
+      // 2. 🌟 FIXED: Upserts the customized address directly to the address_line1 column
+      await client.query(
+    `INSERT INTO public.address_info (
+      application_id, 
+      address_line1, 
+      district, 
+      division, 
+      updated_at
+     )
+     VALUES ($1, $2, 'Unknown', 'Unknown', NOW())
+     ON CONFLICT (application_id)
+     DO UPDATE SET 
+       address_line1 = EXCLUDED.address_line1, 
+       updated_at = NOW();`,
+    [input.applicationId, input.presentAddress]
+  );;
+    },
 };

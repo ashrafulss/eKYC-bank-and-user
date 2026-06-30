@@ -46,14 +46,15 @@ export interface ReviewApplicationData {
 }
 
 export interface UpdateBasicProfilePayload {
-  fullNameBangla: string;
-  fatherNameBangla: string;
-  motherNameBangla: string;
-  email: string;
-  occupation: string;
-  employer: string;
-  monthlyIncome: string;
-  presentAddress: string;
+  fullNameEnglish?: string;
+  fullNameBangla?: string;
+  fatherNameBangla?: string;
+  motherNameBangla?: string;
+  email?: string;
+  occupation?: string;
+  employer?: string;
+  monthlyIncome?: string;
+  presentAddress?: string;
 }
 
 export interface UpdateNomineesPayload {
@@ -86,7 +87,7 @@ export const reviewApplicationService = {
 
 
   async updateBasicProfile(payload: UpdateBasicProfilePayload): Promise<void> {
-    await apiClient.post("/basic-info", payload);
+    await apiClient.put("/update-basic-info", payload);
   },
 
 

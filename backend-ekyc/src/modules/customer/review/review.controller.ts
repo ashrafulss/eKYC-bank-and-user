@@ -3,7 +3,7 @@ import type { Request, Response } from "express";
 import { reviewService } from "./review.service.js";
 import { asyncHandler } from "../../../utils/asyncHandler.js";
 import { ApiResponse } from "../../../utils/ApiResponse.js";
-import { BadRequestError } from "../../../utils/AppError.js";
+import { BadRequestError, UnauthorizedError } from "../../../utils/AppError.js";
 
 export const getApplicationReviewSummary = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.customer?.id;
@@ -34,4 +34,20 @@ export const submitApplication = asyncHandler(async (req: Request, res: Response
   await reviewService.submitApplication(applicationId);
 
   ApiResponse.ok(res, null, "Application submitted successfully. Awaiting bank approval.");
+});
+
+
+export const saveBasicInfoProfile = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.customer?.id; 
+  if (!userId) {
+    throw new UnauthorizedError("Unauthorized profile context session missing.");
+  }
+
+  await reviewService.saveBasicProfile(userId, req.body);
+
+  ApiResponse.ok(
+    res,
+    null,
+    "Basic user registration additions preserved and step advanced successfully."
+  );
 });

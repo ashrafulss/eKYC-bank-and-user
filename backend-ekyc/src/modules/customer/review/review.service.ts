@@ -1,5 +1,6 @@
 
 import pool from "../../../config/db.js";
+import type { PrepopulatedProfileDTO } from "../../../types/basic-info.types.js";
 import { reviewRepository } from "./review.repository.js";
 
 export const reviewService = {
@@ -106,5 +107,44 @@ export const reviewService = {
     } finally {
       client.release();
     }
+  },
+
+
+  async saveBasicProfile(userId: string, profileDto: PrepopulatedProfileDTO): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+
+    const appResult = await client.query(
+      `SELECT id FROM public.applications WHERE user_id = $1 LIMIT 1`,
+      [userId]
+    );
+    if (!appResult.rows.length) throw new Error("Application not found.");
+    const applicationId = appResult.rows[0].id;
+
+await reviewRepository.updatePersonalInfo({
+  applicationId,
+  fullNameEnglish:  profileDto.fullNameEnglish,  
+  fullNameBangla:   profileDto.fullNameBangla,
+  fatherNameBangla: profileDto.fatherNameBangla,
+  motherNameBangla: profileDto.motherNameBangla,
+  nidNumber:        profileDto.nidNumber,         
+  email:            profileDto.email,
+  occupation:       profileDto.occupation,
+  employerName:     profileDto.employer,
+  monthlyIncome:    profileDto.monthlyIncome,
+  presentAddress:   profileDto.presentAddress,
+}, client);
+
+
+
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
   }
+}
 };
