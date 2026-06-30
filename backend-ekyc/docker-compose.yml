@@ -5,9 +5,9 @@ services:
     ports:
       - "5433:5432"
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=sa
-      - POSTGRES_DB=ekyc
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: sa
+      POSTGRES_DB: ekyc
     volumes:
       - ./pgdata_second:/var/lib/postgresql/data
       - ./migrations/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -24,23 +24,25 @@ services:
     restart: always
 
   backend_api:
-    image: node:20-alpine
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: ekyc_backend_api
     working_dir: /app
-    command: npm run dev
     ports:
       - "5000:5000"
     volumes:
       - .:/app
+      - /app/node_modules
     env_file:
       - .env
+    environment:
+      PORT: 5000
+      DATABASE_URL: postgres://postgres:sa@postgres_second:5432/ekyc
+      NID_OCR_URL: http://mockoon_service:3002/api/v1/nid/info
     depends_on:
       - postgres_second
       - mock-apis
-    environment:
-      - PORT=5000
-      - DATABASE_URL=postgres://postgres:sa@postgres_second:5432/ekyc
-      - NID_OCR_URL=http://mockoon_service:3002/api/v1/nid/info
 
   frontend_bank:
     image: node:20-alpine
@@ -53,8 +55,8 @@ services:
       - ../bank-ekyc:/app
       - /app/node_modules
     environment:
-      - PORT= 3000
-      - NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: http://localhost:5000/api/v1
     depends_on:
       - backend_api
 
@@ -69,7 +71,7 @@ services:
       - ../ekyc-frontend:/app
       - /app/node_modules
     environment:
-      - PORT=3001
-      - NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
+      PORT: 3001
+      NEXT_PUBLIC_API_URL: http://localhost:5000/api/v1
     depends_on:
       - backend_api
