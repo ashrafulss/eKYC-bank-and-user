@@ -547,7 +547,7 @@ export default function Review() {
                 <div>
                   <span className="text-[10px] text-gray-400 block font-bold uppercase mb-1">Phone Number</span>
                   <div className="w-full px-3 py-1.5 bg-slate-100/70 border border-gray-200 rounded-md text-sm text-gray-500 select-none">
-                    {user?.mobile + " " + user?.name || "—"}
+                    {user?.mobile || "—"}
                     <span className="text-[10px] ml-1 text-gray-400">(Verified)</span>
                   </div>
                 </div>
