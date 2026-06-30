@@ -33,7 +33,7 @@ export class AuthService {
       .update(rawOtpCode)
       .digest("hex");
 
-    const finalEmail = email ?? "emrandocs@gmail.com";
+    const finalEmail = email ?? process.env.DEFAULT_NOTIFICATION_EMAIL;
 
     await this.authRepository.saveOTPRecord(mobile, finalEmail, hashedOtpCode, expiresAt);
     await this.authRepository.createUserPlaceholder(mobile);
