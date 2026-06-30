@@ -5,12 +5,18 @@ services:
     ports:
       - "5433:5432"
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=sa
-      - POSTGRES_DB=ekyc
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: sa
+      POSTGRES_DB: ekyc
     volumes:
       - ./pgdata_second:/var/lib/postgresql/data
       - ./migrations/init.sql:/docker-entrypoint-initdb.d/init.sql
+    # ─── ADDED HEALTHCHECK ──────────────────────────────────────────
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ekyc"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
 
   mock-apis:
     build:
@@ -24,23 +30,28 @@ services:
     restart: always
 
   backend_api:
-    image: node:20-alpine
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: ekyc_backend_api
     working_dir: /app
-    command: npm run dev
     ports:
       - "5000:5000"
     volumes:
       - .:/app
+      - /app/node_modules
     env_file:
       - .env
-    depends_on:
-      - postgres_second
-      - mock-apis
     environment:
-      - PORT=5000
-      - DATABASE_URL=postgres://postgres:sa@postgres_second:5432/ekyc
-      - NID_OCR_URL=http://mockoon_service:3002/api/v1/nid/info
+      PORT: 5000
+      DATABASE_URL: postgres://postgres:sa@postgres_second:5432/ekyc
+      NID_OCR_URL: http://mockoon_service:3002/api/v1/nid/info
+    # ─── UPDATED DEPENDS_ON ─────────────────────────────────────────
+    depends_on:
+      postgres_second:
+        condition: service_healthy # Wait for DB setup & init.sql to fully finish
+      mock-apis:
+        condition: service_started
 
   frontend_bank:
     image: node:20-alpine
@@ -53,8 +64,8 @@ services:
       - ../bank-ekyc:/app
       - /app/node_modules
     environment:
-      - PORT= 3000
-      - NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: http://localhost:5000/api/v1
     depends_on:
       - backend_api
 
@@ -69,7 +80,7 @@ services:
       - ../ekyc-frontend:/app
       - /app/node_modules
     environment:
-      - PORT=3001
-      - NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
+      PORT: 3001
+      NEXT_PUBLIC_API_URL: http://localhost:5000/api/v1
     depends_on:
       - backend_api
